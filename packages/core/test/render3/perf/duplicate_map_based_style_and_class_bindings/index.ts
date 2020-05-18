@@ -149,7 +149,7 @@ function dirThatSetsFooClassesHostBindings(rf: RenderFlags, ctx: any) {
 }
 
 const rootLView = setupRootViewWithEmbeddedViews(
-    testTemplate, 11, 10, 1000, null,
+    testTemplate, 11, 40, 1000, null,
     [
       ['dir-that-sets-width', '', 'dir-that-sets-foo-class', ''],
     ],
@@ -167,7 +167,7 @@ const refreshTime = duplicateMapBasedStyleAndClassBindingsBenchmark('refresh');
 // run change detection in the update mode
 console.profile('duplicate_map_based_style_and_class_bindings_refresh');
 while (refreshTime()) {
-  refreshView(rootLView, rootTView, null, null);
+  refreshView(rootTView, rootLView, null, null);
 }
 console.profileEnd();
 

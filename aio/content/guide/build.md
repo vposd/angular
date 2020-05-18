@@ -311,11 +311,11 @@ To use CSS grid with IE10/11, you must explicitly enable it using the `autoplace
 To do this, add the following to the top of the global styles file (or within a specific css selector scope):
 
 ```
-/* autoprefixer grid: autoplace /
+/* autoprefixer grid: autoplace */
 ```
 or
 ```
-/ autoprefixer grid: no-autoplace */
+/* autoprefixer grid: no-autoplace */
 ```
 
 For more information, see [Autoprefixer documentation](https://autoprefixer.github.io/).
@@ -325,7 +325,7 @@ For more information, see [Autoprefixer documentation](https://autoprefixer.gith
 
 ## Proxying to a backend server
 
-You can use the [proxying support](https://webpack.js.org/configuration/dev-server/#devserver-proxy) in the `webpack` dev server to divert certain URLs to a backend server, by passing a file to the `--proxy-config` build option.
+You can use the [proxying support](https://webpack.js.org/configuration/dev-server/#devserverproxy) in the `webpack` dev server to divert certain URLs to a backend server, by passing a file to the `--proxy-config` build option.
 For example, to divert all calls for `http://localhost:4200/api` to a server running on `http://localhost:3000/api`, take the following steps.
 
 1. Create a file `proxy.conf.json` in your project's `src/` folder.
@@ -356,7 +356,7 @@ For example, to divert all calls for `http://localhost:4200/api` to a server run
 1. To run the dev server with this proxy configuration, call `ng serve`.
 
 You can edit the proxy configuration file to add configuration options; some examples are given below.
-For a description of all options, see [webpack DevServer documentation](https://webpack.js.org/configuration/dev-server/#devserver-proxy).
+For a description of all options, see [webpack DevServer documentation](https://webpack.js.org/configuration/dev-server/#devserverproxy).
 
 Note that if you edit the proxy configuration file, you must relaunch the `ng serve` process to make your changes effective.
 

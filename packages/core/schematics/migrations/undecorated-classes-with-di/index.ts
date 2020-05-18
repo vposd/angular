@@ -24,7 +24,7 @@ import {UndecoratedClassesTransform} from './transform';
 import {UpdateRecorder} from './update_recorder';
 
 const MIGRATION_RERUN_MESSAGE = 'Migration can be rerun with: "ng update @angular/core ' +
-    '--from 8.0.0 --to 9.0.0 --migrate-only"';
+    '--migrate-only migration-v9-undecorated-classes-with-di"';
 
 const MIGRATION_AOT_FAILURE = 'This migration uses the Angular compiler internally and ' +
     'therefore projects that no longer build successfully after the update cannot run ' +
@@ -82,8 +82,8 @@ function runUndecoratedClassesMigration(
 
   const {program, compiler} = programData;
   const typeChecker = program.getTypeChecker();
-  const partialEvaluator =
-      new PartialEvaluator(new TypeScriptReflectionHost(typeChecker), typeChecker);
+  const partialEvaluator = new PartialEvaluator(
+      new TypeScriptReflectionHost(typeChecker), typeChecker, /* dependencyTracker */ null);
   const declarationCollector = new NgDeclarationCollector(typeChecker, partialEvaluator);
   const sourceFiles = program.getSourceFiles().filter(
       s => !s.isDeclarationFile && !program.isSourceFileFromExternalLibrary(s));
@@ -123,7 +123,7 @@ function runUndecoratedClassesMigration(
   /** Gets the update recorder for the specified source file. */
   function getUpdateRecorder(sourceFile: ts.SourceFile): UpdateRecorder {
     if (updateRecorders.has(sourceFile)) {
-      return updateRecorders.get(sourceFile) !;
+      return updateRecorders.get(sourceFile)!;
     }
     const treeRecorder = tree.beginUpdate(relative(basePath, sourceFile.fileName));
     const recorder: UpdateRecorder = {
@@ -146,7 +146,9 @@ function runUndecoratedClassesMigration(
         treeRecorder.remove(namedBindings.getStart(), namedBindings.getWidth());
         treeRecorder.insertRight(namedBindings.getStart(), newNamedBindings);
       },
-      commitUpdate() { tree.commitUpdate(treeRecorder); }
+      commitUpdate() {
+        tree.commitUpdate(treeRecorder);
+      }
     };
     updateRecorders.set(sourceFile, recorder);
     return recorder;

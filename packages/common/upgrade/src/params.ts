@@ -152,7 +152,9 @@ export class AngularJSUrlCodec implements UrlCodec {
   }
 
   // https://github.com/angular/angular.js/blob/864c7f0/src/ng/location.js#L72
-  decodeSearch(search: string) { return parseKeyValue(search); }
+  decodeSearch(search: string) {
+    return parseKeyValue(search);
+  }
 
   // https://github.com/angular/angular.js/blob/864c7f0/src/ng/location.js#L73
   decodeHash(hash: string) {
@@ -193,7 +195,9 @@ export class AngularJSUrlCodec implements UrlCodec {
     }
   }
 
-  areEqual(valA: string, valB: string) { return this.normalize(valA) === this.normalize(valB); }
+  areEqual(valA: string, valB: string) {
+    return this.normalize(valA) === this.normalize(valB);
+  }
 
   // https://github.com/angular/angular.js/blob/864c7f0/src/ng/urlUtils.js#L60
   parse(url: string, base?: string) {
@@ -223,12 +227,10 @@ function _stripIndexHtml(url: string): string {
 /**
  * Tries to decode the URI component without throwing an exception.
  *
- * @private
  * @param str value potential URI component to check.
- * @returns {boolean} True if `value` can be decoded
- * with the decodeURIComponent function.
+ * @returns the decoded URI if it can be decoded or else `undefined`.
  */
-function tryDecodeURIComponent(value: string) {
+function tryDecodeURIComponent(value: string): string|undefined {
   try {
     return decodeURIComponent(value);
   } catch (e) {
@@ -241,7 +243,6 @@ function tryDecodeURIComponent(value: string) {
 /**
  * Parses an escaped url query string into key-value pairs. Logic taken from
  * https://github.com/angular/angular.js/blob/864c7f0/src/Angular.js#L1382
- * @returns {Object.<string,boolean|Array>}
  */
 function parseKeyValue(keyValue: string): {[k: string]: unknown} {
   const obj: {[k: string]: unknown} = {};

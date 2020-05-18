@@ -22,7 +22,9 @@
  * ```
  */
 
-export interface ExportedCompilerFacade { ɵcompilerFacade: CompilerFacade; }
+export interface ExportedCompilerFacade {
+  ɵcompilerFacade: CompilerFacade;
+}
 
 export interface CompilerFacade {
   compilePipe(angularCoreEnv: CoreEnvironment, sourceMapUrl: string, meta: R3PipeMetadataFacade):
@@ -44,13 +46,15 @@ export interface CompilerFacade {
 
   R3ResolvedDependencyType: typeof R3ResolvedDependencyType;
   R3FactoryTarget: typeof R3FactoryTarget;
-  ResourceLoader: {new (): ResourceLoader};
+  ResourceLoader: {new(): ResourceLoader};
 }
 
-export interface CoreEnvironment { [name: string]: Function; }
+export interface CoreEnvironment {
+  [name: string]: Function;
+}
 
 export type ResourceLoader = {
-  get(url: string): Promise<string>| string;
+  get(url: string): Promise<string>|string;
 };
 
 export type StringMap = {
@@ -58,7 +62,7 @@ export type StringMap = {
 };
 
 export type StringMapWithRename = {
-  [key: string]: string | [string, string];
+  [key: string]: string|[string, string];
 };
 
 export type Provider = any;
@@ -67,6 +71,7 @@ export enum R3ResolvedDependencyType {
   Token = 0,
   Attribute = 1,
   ChangeDetectorRef = 2,
+  Invalid = 3,
 }
 
 export enum R3FactoryTarget {

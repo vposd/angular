@@ -12,9 +12,8 @@ import {Provider} from '../di/interface/provider';
 import {convertInjectableProviderToFactory} from '../di/util';
 import {Type} from '../interface/type';
 import {SchemaMetadata} from '../metadata/schema';
-import {NgModuleType} from '../render3';
 import {compileNgModule as render3CompileNgModule} from '../render3/jit/module';
-import {TypeDecorator, makeDecorator} from '../util/decorators';
+import {makeDecorator, TypeDecorator} from '../util/decorators';
 
 
 /**
@@ -83,16 +82,14 @@ export interface NgModuleDef<T> {
 /**
  * A wrapper around an NgModule that associates it with the providers.
  *
- * @param T the module type. In Ivy applications, this must be explicitly
- * provided.
+ * @param T the module type.
  *
  * Note that using ModuleWithProviders without a generic type is deprecated.
  * The generic will become required in a future version of Angular.
  *
  * @publicApi
  */
-export interface ModuleWithProviders<
-    T = any /** TODO(alxhub): remove default when callers pass explicit type param */> {
+export interface ModuleWithProviders<T> {
   ngModule: Type<T>;
   providers?: Provider[];
 }
@@ -108,7 +105,7 @@ export interface NgModuleDecorator {
    * Decorator that marks a class as an NgModule and supplies configuration metadata.
    */
   (obj?: NgModule): TypeDecorator;
-  new (obj?: NgModule): NgModule;
+  new(obj?: NgModule): NgModule;
 }
 
 /**
@@ -346,7 +343,9 @@ export const NgModule: NgModuleDecorator = makeDecorator(
  *
  * @publicApi
  */
-export interface DoBootstrap { ngDoBootstrap(appRef: ApplicationRef): void; }
+export interface DoBootstrap {
+  ngDoBootstrap(appRef: ApplicationRef): void;
+}
 
 function preR3NgModuleCompile(moduleType: Type<any>, metadata?: NgModule): void {
   let imports = (metadata && metadata.imports) || [];

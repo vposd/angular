@@ -54,7 +54,8 @@ the server-rendered app can be properly bootstrapped into a client app.`);
               try {
                 const callbackResult = callback();
                 if (ɵisPromise(callbackResult)) {
-                  asyncPromises.push(callbackResult);
+                  // TODO: in TS3.7, callbackResult is void.
+                  asyncPromises.push(callbackResult as any);
                 }
 
               } catch (e) {
@@ -76,8 +77,9 @@ the server-rendered app can be properly bootstrapped into a client app.`);
 
           return Promise
               .all(asyncPromises.map(asyncPromise => {
-                return asyncPromise.catch(
-                    e => { console.warn('Ignoring BEFORE_APP_SERIALIZED Exception: ', e); });
+                return asyncPromise.catch(e => {
+                  console.warn('Ignoring BEFORE_APP_SERIALIZED Exception: ', e);
+                });
               }))
               .then(complete);
         });

@@ -8,46 +8,57 @@
 
 /// <reference types="node" />
 
+import {getFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system';
 import * as cluster from 'cluster';
 
+import {MockFileSystemNative, runInEachFileSystem} from '../../../../src/ngtsc/file_system/testing';
 import {ClusterExecutor} from '../../../src/execution/cluster/executor';
 import {ClusterMaster} from '../../../src/execution/cluster/master';
-import {ClusterWorker} from '../../../src/execution/cluster/worker';
+import {AsyncLocker} from '../../../src/locking/async_locker';
+import {FileWriter} from '../../../src/writing/file_writer';
 import {PackageJsonUpdater} from '../../../src/writing/package_json_updater';
+import {MockLockFile} from '../../helpers/mock_lock_file';
 import {MockLogger} from '../../helpers/mock_logger';
 import {mockProperty} from '../../helpers/spy_utils';
 
+runInEachFileSystem(() => {
+  describe('ClusterExecutor', () => {
+    const runAsClusterMaster = mockProperty(cluster, 'isMaster');
+    let masterRunSpy: jasmine.Spy;
+    let mockLogger: MockLogger;
+    let lockFileLog: string[];
+    let mockLockFile: MockLockFile;
+    let locker: AsyncLocker;
+    let executor: ClusterExecutor;
+    let createTaskCompletedCallback: jasmine.Spy;
 
-describe('ClusterExecutor', () => {
-  const runAsClusterMaster = mockProperty(cluster, 'isMaster');
-  let masterRunSpy: jasmine.Spy;
-  let workerRunSpy: jasmine.Spy;
-  let mockLogger: MockLogger;
-  let executor: ClusterExecutor;
+    beforeEach(() => {
+      masterRunSpy = spyOn(ClusterMaster.prototype, 'run')
+                         .and.returnValue(Promise.resolve('CusterMaster#run()' as any));
+      createTaskCompletedCallback = jasmine.createSpy('createTaskCompletedCallback');
 
-  beforeEach(() => {
-    masterRunSpy = spyOn(ClusterMaster.prototype, 'run');
-    workerRunSpy = spyOn(ClusterWorker.prototype, 'run');
+      mockLogger = new MockLogger();
+      lockFileLog = [];
+      mockLockFile = new MockLockFile(new MockFileSystemNative(), lockFileLog);
+      locker = new AsyncLocker(mockLockFile, mockLogger, 200, 2);
+      executor = new ClusterExecutor(
+          42, getFileSystem(), mockLogger, null as unknown as FileWriter,
+          null as unknown as PackageJsonUpdater, locker, createTaskCompletedCallback);
+    });
 
-    mockLogger = new MockLogger();
-    executor = new ClusterExecutor(42, mockLogger, null as unknown as PackageJsonUpdater);
-  });
-
-  describe('execute()', () => {
-    describe('(on cluster master)', () => {
+    describe('execute()', () => {
       beforeEach(() => runAsClusterMaster(true));
 
-      it('should log debug info about the executor', () => {
+      it('should log debug info about the executor', async () => {
         const anyFn: () => any = () => undefined;
-        executor.execute(anyFn, anyFn);
+        await executor.execute(anyFn, anyFn);
 
         expect(mockLogger.logs.debug).toEqual([
           ['Running ngcc on ClusterExecutor (using 42 worker processes).'],
         ]);
       });
 
-      it('should delegate to `ClusterMaster#run()`', async() => {
-        masterRunSpy.and.returnValue('CusterMaster#run()');
+      it('should delegate to `ClusterMaster#run()`', async () => {
         const analyzeEntryPointsSpy = jasmine.createSpy('analyzeEntryPoints');
         const createCompilerFnSpy = jasmine.createSpy('createCompilerFn');
 
@@ -55,36 +66,70 @@ describe('ClusterExecutor', () => {
             .toBe('CusterMaster#run()' as any);
 
         expect(masterRunSpy).toHaveBeenCalledWith();
-        expect(workerRunSpy).not.toHaveBeenCalled();
 
         expect(analyzeEntryPointsSpy).toHaveBeenCalledWith();
         expect(createCompilerFnSpy).not.toHaveBeenCalled();
       });
-    });
 
-    describe('(on cluster worker)', () => {
-      beforeEach(() => runAsClusterMaster(false));
+      it('should call LockFile.write() and LockFile.remove() if master runner completes successfully',
+         async () => {
+           const anyFn: () => any = () => undefined;
+           await executor.execute(anyFn, anyFn);
+           expect(lockFileLog).toEqual(['write()', 'remove()']);
+         });
 
-      it('should not log debug info about the executor', () => {
+      it('should call LockFile.write() and LockFile.remove() if master runner fails', async () => {
         const anyFn: () => any = () => undefined;
-        executor.execute(anyFn, anyFn);
-
-        expect(mockLogger.logs.debug).toEqual([]);
+        masterRunSpy.and.returnValue(Promise.reject(new Error('master runner error')));
+        let error = '';
+        try {
+          await executor.execute(anyFn, anyFn);
+        } catch (e) {
+          error = e.message;
+        }
+        expect(error).toEqual('master runner error');
+        expect(lockFileLog).toEqual(['write()', 'remove()']);
       });
 
-      it('should delegate to `ClusterWorker#run()`', async() => {
-        workerRunSpy.and.returnValue('CusterWorker#run()');
-        const analyzeEntryPointsSpy = jasmine.createSpy('analyzeEntryPoints');
-        const createCompilerFnSpy = jasmine.createSpy('createCompilerFn');
+      it('should not call master runner if LockFile.write() fails', async () => {
+        const anyFn: () => any = () => undefined;
+        spyOn(mockLockFile, 'write').and.callFake(() => {
+          lockFileLog.push('write()');
+          throw new Error('LockFile.write() error');
+        });
 
-        expect(await executor.execute(analyzeEntryPointsSpy, createCompilerFnSpy))
-            .toBe('CusterWorker#run()' as any);
+        executor = new ClusterExecutor(
+            42, getFileSystem(), mockLogger, null as unknown as FileWriter,
+            null as unknown as PackageJsonUpdater, locker, createTaskCompletedCallback);
+        let error = '';
+        try {
+          await executor.execute(anyFn, anyFn);
+        } catch (e) {
+          error = e.message;
+        }
+        expect(error).toEqual('LockFile.write() error');
+        expect(masterRunSpy).not.toHaveBeenCalled();
+      });
 
-        expect(masterRunSpy).not.toHaveBeenCalledWith();
-        expect(workerRunSpy).toHaveBeenCalled();
+      it('should fail if LockFile.remove() fails', async () => {
+        const anyFn: () => any = () => undefined;
+        spyOn(mockLockFile, 'remove').and.callFake(() => {
+          lockFileLog.push('remove()');
+          throw new Error('LockFile.remove() error');
+        });
 
-        expect(analyzeEntryPointsSpy).not.toHaveBeenCalled();
-        expect(createCompilerFnSpy).toHaveBeenCalledWith(jasmine.any(Function));
+        executor = new ClusterExecutor(
+            42, getFileSystem(), mockLogger, null as unknown as FileWriter,
+            null as unknown as PackageJsonUpdater, locker, createTaskCompletedCallback);
+        let error = '';
+        try {
+          await executor.execute(anyFn, anyFn);
+        } catch (e) {
+          error = e.message;
+        }
+        expect(error).toEqual('LockFile.remove() error');
+        expect(lockFileLog).toEqual(['write()', 'remove()']);
+        expect(masterRunSpy).toHaveBeenCalled();
       });
     });
   });

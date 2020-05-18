@@ -15,7 +15,7 @@ import * as o from '../output/output_ast';
 import {Identifiers as R3} from '../render3/r3_identifiers';
 import {OutputContext} from '../util';
 
-import {typeWithParameters} from './util';
+import {R3Reference, typeWithParameters} from './util';
 import {unsupported} from './view/util';
 
 
@@ -32,7 +32,7 @@ export interface R3ConstructorFactoryMetadata {
   /**
    * An expression representing the interface type being constructed.
    */
-  type: o.Expression;
+  type: R3Reference;
 
   /**
    * An expression representing the constructor type, intended for use within a class definition
@@ -89,8 +89,8 @@ export interface R3ExpressionFactoryMetadata extends R3ConstructorFactoryMetadat
   expression: o.Expression;
 }
 
-export type R3FactoryMetadata = R3ConstructorFactoryMetadata | R3DelegatedFactoryMetadata |
-    R3DelegatedFnOrClassMetadata | R3ExpressionFactoryMetadata;
+export type R3FactoryMetadata = R3ConstructorFactoryMetadata|R3DelegatedFactoryMetadata|
+    R3DelegatedFnOrClassMetadata|R3ExpressionFactoryMetadata;
 
 export enum R3FactoryTarget {
   Directive = 0,
@@ -125,6 +125,11 @@ export enum R3ResolvedDependencyType {
    * Injecting the `ChangeDetectorRef` token. Needs special handling when injected into a pipe.
    */
   ChangeDetectorRef = 2,
+
+  /**
+   * An invalid dependency (no token could be determined). An error should be thrown at runtime.
+   */
+  Invalid = 3,
 }
 
 /**
@@ -135,6 +140,13 @@ export interface R3DependencyMetadata {
    * An expression representing the token or value to be injected.
    */
   token: o.Expression;
+
+  /**
+   * If an @Attribute decorator is present, this is the literal type of the attribute name, or
+   * the unknown type if no literal type is available (e.g. the attribute name is an expression).
+   * Will be null otherwise.
+   */
+  attribute: o.Expression|null;
 
   /**
    * An enum indicating whether this dependency has special meaning to Angular and needs to be
@@ -175,6 +187,7 @@ export interface R3FactoryFn {
 export function compileFactoryFunction(meta: R3FactoryMetadata): R3FactoryFn {
   const t = o.variable('t');
   const statements: o.Statement[] = [];
+  let ctorDepsType: o.Type = o.NONE_TYPE;
 
   // The type to instantiate via constructor invocation. If there is no delegated factory, meaning
   // this type is always created by constructor invocation, then this is the type-to-create
@@ -192,6 +205,8 @@ export function compileFactoryFunction(meta: R3FactoryMetadata): R3FactoryFn {
       ctorExpr = new o.InstantiateExpr(
           typeForCtor,
           injectDependencies(meta.deps, meta.injectFn, meta.target === R3FactoryTarget.Pipe));
+
+      ctorDepsType = createCtorDepsType(meta.deps);
     }
   } else {
     const baseFactory = o.variable(`ɵ${meta.name}_BaseFactory`);
@@ -264,18 +279,19 @@ export function compileFactoryFunction(meta: R3FactoryMetadata): R3FactoryFn {
         [new o.FnParam('t', o.DYNAMIC_TYPE)], body, o.INFERRED_TYPE, undefined,
         `${meta.name}_Factory`),
     statements,
-    type: o.expressionType(
-        o.importExpr(R3.FactoryDef, [typeWithParameters(meta.type, meta.typeArgumentCount)]))
+    type: o.expressionType(o.importExpr(
+        R3.FactoryDef, [typeWithParameters(meta.type.type, meta.typeArgumentCount), ctorDepsType]))
   };
 }
 
 function injectDependencies(
     deps: R3DependencyMetadata[], injectFn: o.ExternalReference, isPipe: boolean): o.Expression[] {
-  return deps.map(dep => compileInjectDependency(dep, injectFn, isPipe));
+  return deps.map((dep, index) => compileInjectDependency(dep, injectFn, isPipe, index));
 }
 
 function compileInjectDependency(
-    dep: R3DependencyMetadata, injectFn: o.ExternalReference, isPipe: boolean): o.Expression {
+    dep: R3DependencyMetadata, injectFn: o.ExternalReference, isPipe: boolean,
+    index: number): o.Expression {
   // Interpret the dependency according to its resolved type.
   switch (dep.resolved) {
     case R3ResolvedDependencyType.Token:
@@ -305,10 +321,55 @@ function compileInjectDependency(
     case R3ResolvedDependencyType.Attribute:
       // In the case of attributes, the attribute name in question is given as the token.
       return o.importExpr(R3.injectAttribute).callFn([dep.token]);
+    case R3ResolvedDependencyType.Invalid:
+      return o.importExpr(R3.invalidFactoryDep).callFn([o.literal(index)]);
     default:
       return unsupported(
           `Unknown R3ResolvedDependencyType: ${R3ResolvedDependencyType[dep.resolved]}`);
   }
+}
+
+function createCtorDepsType(deps: R3DependencyMetadata[]): o.Type {
+  let hasTypes = false;
+  const attributeTypes = deps.map(dep => {
+    const type = createCtorDepType(dep);
+    if (type !== null) {
+      hasTypes = true;
+      return type;
+    } else {
+      return o.literal(null);
+    }
+  });
+
+  if (hasTypes) {
+    return o.expressionType(o.literalArr(attributeTypes));
+  } else {
+    return o.NONE_TYPE;
+  }
+}
+
+function createCtorDepType(dep: R3DependencyMetadata): o.LiteralMapExpr|null {
+  const entries: {key: string, quoted: boolean, value: o.Expression}[] = [];
+
+  if (dep.resolved === R3ResolvedDependencyType.Attribute) {
+    if (dep.attribute !== null) {
+      entries.push({key: 'attribute', value: dep.attribute, quoted: false});
+    }
+  }
+  if (dep.optional) {
+    entries.push({key: 'optional', value: o.literal(true), quoted: false});
+  }
+  if (dep.host) {
+    entries.push({key: 'host', value: o.literal(true), quoted: false});
+  }
+  if (dep.self) {
+    entries.push({key: 'self', value: o.literal(true), quoted: false});
+  }
+  if (dep.skipSelf) {
+    entries.push({key: 'skipSelf', value: o.literal(true), quoted: false});
+  }
+
+  return entries.length > 0 ? o.literalMap(entries) : null;
 }
 
 /**
@@ -340,6 +401,7 @@ export function dependenciesFromGlobalMetadata(
       // Construct the dependency.
       deps.push({
         token,
+        attribute: null,
         resolved,
         host: !!dependency.isHost,
         optional: !!dependency.isOptional,

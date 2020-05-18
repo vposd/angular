@@ -9,7 +9,7 @@
 import * as ts from 'typescript';
 
 import {Reference} from '../../imports';
-import {ClassDeclaration, ReflectionHost, isNamedClassDeclaration} from '../../reflection';
+import {ClassDeclaration, isNamedClassDeclaration, ReflectionHost} from '../../reflection';
 
 import {DirectiveMeta, MetadataReader, NgModuleMeta, PipeMeta} from './api';
 import {extractDirectiveGuards, extractReferencesFromType, readStringArrayType, readStringMapType, readStringType} from './util';
@@ -55,6 +55,7 @@ export class DtsMetadataReader implements MetadataReader {
       imports: extractReferencesFromType(
           this.checker, importMetadata, ref.ownedByModuleGuess, resolutionContext),
       schemas: [],
+      rawDeclarations: null,
     };
   }
 

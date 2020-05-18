@@ -8,8 +8,9 @@
 
 import * as ts from 'typescript';
 
-import {ClassDeclaration, ClassMember, ClassMemberKind, CtorParameter, Declaration, Decorator, FunctionDefinition, Import, ReflectionHost, isDecoratorIdentifier} from './host';
+import {ClassDeclaration, ClassMember, ClassMemberKind, CtorParameter, Declaration, Decorator, FunctionDefinition, Import, isDecoratorIdentifier, ReflectionHost} from './host';
 import {typeToValue} from './type_to_value';
+import {isNamedClassDeclaration} from './util';
 
 /**
  * reflector.ts implements static reflection of declarations using the TypeScript `ts.TypeChecker`.
@@ -35,8 +36,12 @@ export class TypeScriptReflectionHost implements ReflectionHost {
   getConstructorParameters(clazz: ClassDeclaration): CtorParameter[]|null {
     const tsClazz = castDeclarationToClassOrDie(clazz);
 
-    // First, find the constructor.
-    const ctor = tsClazz.members.find(ts.isConstructorDeclaration);
+    // First, find the constructor with a `body`. The constructors without a `body` are overloads
+    // whereas we want the implementation since it's the one that'll be executed and which can
+    // have decorators.
+    const ctor = tsClazz.members.find(
+        (member): member is ts.ConstructorDeclaration =>
+            ts.isConstructorDeclaration(member) && member.body !== undefined);
     if (ctor === undefined) {
       return null;
     }
@@ -72,8 +77,10 @@ export class TypeScriptReflectionHost implements ReflectionHost {
 
       return {
         name,
-        nameNode: node.name, typeValueReference,
-        typeNode: originalTypeNode, decorators,
+        nameNode: node.name,
+        typeValueReference,
+        typeNode: originalTypeNode,
+        decorators,
       };
     });
   }
@@ -94,7 +101,7 @@ export class TypeScriptReflectionHost implements ReflectionHost {
   getExportsOfModule(node: ts.Node): Map<string, Declaration>|null {
     // In TypeScript code, modules are only ts.SourceFiles. Throw if the node isn't a module.
     if (!ts.isSourceFile(node)) {
-      throw new Error(`getDeclarationsOfModule() called on non-SourceFile in TS code`);
+      throw new Error(`getExportsOfModule() called on non-SourceFile in TS code`);
     }
     const map = new Map<string, Declaration>();
 
@@ -115,15 +122,13 @@ export class TypeScriptReflectionHost implements ReflectionHost {
   }
 
   isClass(node: ts.Node): node is ClassDeclaration {
-    // In TypeScript code, classes are ts.ClassDeclarations.
-    // (`name` can be undefined in unnamed default exports: `default export class { ... }`)
-    return ts.isClassDeclaration(node) && (node.name !== undefined) && ts.isIdentifier(node.name);
+    // For our purposes, classes are "named" ts.ClassDeclarations;
+    // (`node.name` can be undefined in unnamed default exports: `default export class { ... }`).
+    return isNamedClassDeclaration(node);
   }
 
   hasBaseClass(clazz: ClassDeclaration): boolean {
-    return (ts.isClassDeclaration(clazz) || ts.isClassExpression(clazz)) &&
-        clazz.heritageClauses !== undefined &&
-        clazz.heritageClauses.some(clause => clause.token === ts.SyntaxKind.ExtendsKeyword);
+    return this.getBaseClassExpression(clazz) !== null;
   }
 
   getBaseClassExpression(clazz: ClassDeclaration): ts.Expression|null {
@@ -160,7 +165,6 @@ export class TypeScriptReflectionHost implements ReflectionHost {
     return {
       node,
       body: node.body !== undefined ? Array.from(node.body.statements) : null,
-      helper: null,
       parameters: node.parameters.map(param => {
         const name = parameterName(param.name);
         const initializer = param.initializer || null;
@@ -180,11 +184,17 @@ export class TypeScriptReflectionHost implements ReflectionHost {
     return declaration.initializer || null;
   }
 
-  getDtsDeclaration(_: ts.Declaration): ts.Declaration|null { return null; }
+  getDtsDeclaration(_: ts.Declaration): ts.Declaration|null {
+    return null;
+  }
 
-  getInternalNameOfClass(clazz: ClassDeclaration): ts.Identifier { return clazz.name; }
+  getInternalNameOfClass(clazz: ClassDeclaration): ts.Identifier {
+    return clazz.name;
+  }
 
-  getAdjacentNameOfClass(clazz: ClassDeclaration): ts.Identifier { return clazz.name; }
+  getAdjacentNameOfClass(clazz: ClassDeclaration): ts.Identifier {
+    return clazz.name;
+  }
 
   protected getDirectImportOfIdentifier(id: ts.Identifier): Import|null {
     const symbol = this.checker.getSymbolAtLocation(id);
@@ -262,16 +272,14 @@ export class TypeScriptReflectionHost implements ReflectionHost {
 
   /**
    * Resolve a `ts.Symbol` to its declaration, keeping track of the `viaModule` along the way.
-   *
-   * @internal
    */
-  private getDeclarationOfSymbol(symbol: ts.Symbol, originalId: ts.Identifier|null): Declaration
+  protected getDeclarationOfSymbol(symbol: ts.Symbol, originalId: ts.Identifier|null): Declaration
       |null {
     // If the symbol points to a ShorthandPropertyAssignment, resolve it.
     let valueDeclaration: ts.Declaration|undefined = undefined;
     if (symbol.valueDeclaration !== undefined) {
       valueDeclaration = symbol.valueDeclaration;
-    } else if (symbol.declarations.length > 0) {
+    } else if (symbol.declarations !== undefined && symbol.declarations.length > 0) {
       valueDeclaration = symbol.declarations[0];
     }
     if (valueDeclaration !== undefined && ts.isShorthandPropertyAssignment(valueDeclaration)) {
@@ -304,12 +312,16 @@ export class TypeScriptReflectionHost implements ReflectionHost {
     if (symbol.valueDeclaration !== undefined) {
       return {
         node: symbol.valueDeclaration,
+        known: null,
         viaModule,
+        identity: null,
       };
     } else if (symbol.declarations !== undefined && symbol.declarations.length > 0) {
       return {
         node: symbol.declarations[0],
+        known: null,
         viaModule,
+        identity: null,
       };
     } else {
       return null;
@@ -341,7 +353,9 @@ export class TypeScriptReflectionHost implements ReflectionHost {
     return {
       name: decoratorIdentifier.text,
       identifier: decoratorExpr,
-      import: importDecl, node, args,
+      import: importDecl,
+      node,
+      args,
     };
   }
 
@@ -381,8 +395,14 @@ export class TypeScriptReflectionHost implements ReflectionHost {
 
     return {
       node,
-      implementation: node, kind,
-      type: node.type || null, name, nameNode, decorators, value, isStatic,
+      implementation: node,
+      kind,
+      type: node.type || null,
+      name,
+      nameNode,
+      decorators,
+      value,
+      isStatic,
     };
   }
 }
@@ -404,7 +424,7 @@ export function reflectIdentifierOfDeclaration(decl: ts.Declaration): ts.Identif
 }
 
 export function reflectTypeEntityToDeclaration(
-    type: ts.EntityName, checker: ts.TypeChecker): {node: ts.Declaration, from: string | null} {
+    type: ts.EntityName, checker: ts.TypeChecker): {node: ts.Declaration, from: string|null} {
   let realSymbol = checker.getSymbolAtLocation(type);
   if (realSymbol === undefined) {
     throw new Error(`Cannot resolve type entity ${type.getText()} to symbol`);
@@ -433,8 +453,8 @@ export function reflectTypeEntityToDeclaration(
     }
     const decl = symbol.declarations[0];
     if (ts.isNamespaceImport(decl)) {
-      const clause = decl.parent !;
-      const importDecl = clause.parent !;
+      const clause = decl.parent!;
+      const importDecl = clause.parent!;
       if (!ts.isStringLiteral(importDecl.moduleSpecifier)) {
         throw new Error(`Module specifier is not a string`);
       }
@@ -551,7 +571,7 @@ function getFarLeftIdentifier(propertyAccess: ts.PropertyAccessExpression): ts.I
  * `NamespaceImport`. If not return `null`.
  */
 function getContainingImportDeclaration(node: ts.Node): ts.ImportDeclaration|null {
-  return ts.isImportSpecifier(node) ? node.parent !.parent !.parent ! :
+  return ts.isImportSpecifier(node) ? node.parent!.parent!.parent! :
                                       ts.isNamespaceImport(node) ? node.parent.parent : null;
 }
 

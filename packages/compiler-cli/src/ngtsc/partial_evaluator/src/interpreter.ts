@@ -10,14 +10,15 @@ import * as ts from 'typescript';
 
 import {Reference} from '../../imports';
 import {OwningModule} from '../../imports/src/references';
-import {Declaration, InlineDeclaration, ReflectionHost} from '../../reflection';
+import {DependencyTracker} from '../../incremental/api';
+import {ConcreteDeclaration, Declaration, EnumMember, InlineDeclaration, ReflectionHost, SpecialDeclarationKind} from '../../reflection';
 import {isDeclaration} from '../../util/src/typescript';
 
 import {ArrayConcatBuiltinFn, ArraySliceBuiltinFn} from './builtin';
 import {DynamicValue} from './dynamic';
-import {DependencyTracker, ForeignFunctionResolver} from './interface';
-import {BuiltinFn, EnumValue, ResolvedModule, ResolvedValue, ResolvedValueArray, ResolvedValueMap} from './result';
-import {evaluateTsHelperInline} from './ts_helpers';
+import {ForeignFunctionResolver} from './interface';
+import {resolveKnownDeclaration} from './known_declaration';
+import {EnumValue, KnownFn, ResolvedModule, ResolvedValue, ResolvedValueArray, ResolvedValueMap} from './result';
 
 
 
@@ -89,7 +90,7 @@ interface Context {
 export class StaticInterpreter {
   constructor(
       private host: ReflectionHost, private checker: ts.TypeChecker,
-      private dependencyTracker?: DependencyTracker) {}
+      private dependencyTracker: DependencyTracker|null) {}
 
   visit(node: ts.Expression, context: Context): ResolvedValue {
     return this.visitExpression(node, context);
@@ -202,19 +203,13 @@ export class StaticInterpreter {
     const pieces: string[] = [node.head.text];
     for (let i = 0; i < node.templateSpans.length; i++) {
       const span = node.templateSpans[i];
-      let value = this.visit(span.expression, context);
-      if (value instanceof EnumValue) {
-        value = value.resolved;
-      }
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ||
-          value == null) {
-        pieces.push(`${value}`);
-      } else if (value instanceof DynamicValue) {
+      const value = literal(
+          this.visit(span.expression, context),
+          () => DynamicValue.fromDynamicString(span.expression));
+      if (value instanceof DynamicValue) {
         return DynamicValue.fromDynamicInput(node, value);
-      } else {
-        return DynamicValue.fromDynamicInput(node, DynamicValue.fromDynamicString(span.expression));
       }
-      pieces.push(span.literal.text);
+      pieces.push(`${value}`, span.literal.text);
     }
     return pieces.join('');
   }
@@ -227,6 +222,13 @@ export class StaticInterpreter {
       } else {
         return DynamicValue.fromUnknownIdentifier(node);
       }
+    }
+    if (decl.known !== null) {
+      return resolveKnownDeclaration(decl.known);
+    } else if (
+        isConcreteDeclaration(decl) && decl.identity !== null &&
+        decl.identity.kind === SpecialDeclarationKind.DownleveledEnum) {
+      return this.getResolvedEnum(decl.node, decl.identity.enumMembers, context);
     }
     const declContext = {...context, ...joinModuleContext(context, node, decl)};
     // The identifier's declaration is either concrete (a ts.Declaration exists for it) or inline
@@ -249,15 +251,15 @@ export class StaticInterpreter {
   }
 
   private visitDeclaration(node: ts.Declaration, context: Context): ResolvedValue {
-    if (this.dependencyTracker) {
-      this.dependencyTracker.trackFileDependency(node.getSourceFile(), context.originatingFile);
+    if (this.dependencyTracker !== null) {
+      this.dependencyTracker.addDependency(context.originatingFile, node.getSourceFile());
     }
     if (this.host.isClass(node)) {
       return this.getReference(node, context);
     } else if (ts.isVariableDeclaration(node)) {
       return this.visitVariableDeclaration(node, context);
     } else if (ts.isParameter(node) && context.scope.has(node)) {
-      return context.scope.get(node) !;
+      return context.scope.get(node)!;
     } else if (ts.isExportAssignment(node)) {
       return this.visitExpression(node.expression, context);
     } else if (ts.isEnumDeclaration(node)) {
@@ -281,7 +283,7 @@ export class StaticInterpreter {
   }
 
   private visitEnumDeclaration(node: ts.EnumDeclaration, context: Context): ResolvedValue {
-    const enumRef = this.getReference(node, context) as Reference<ts.EnumDeclaration>;
+    const enumRef = this.getReference(node, context);
     const map = new Map<string, EnumValue>();
     node.members.forEach(member => {
       const name = this.stringNameFromPropertyName(member.name, context);
@@ -328,8 +330,13 @@ export class StaticInterpreter {
     }
 
     return new ResolvedModule(declarations, decl => {
+      if (decl.known !== null) {
+        return resolveKnownDeclaration(decl.known);
+      }
+
       const declContext = {
-          ...context, ...joinModuleContext(context, node, decl),
+        ...context,
+        ...joinModuleContext(context, node, decl),
       };
 
       // Visit both concrete and inline declarations.
@@ -346,7 +353,7 @@ export class StaticInterpreter {
     const strIndex = `${rhs}`;
     if (lhs instanceof Map) {
       if (lhs.has(strIndex)) {
-        return lhs.get(strIndex) !;
+        return lhs.get(strIndex)!;
       } else {
         return undefined;
       }
@@ -356,9 +363,9 @@ export class StaticInterpreter {
       if (rhs === 'length') {
         return lhs.length;
       } else if (rhs === 'slice') {
-        return new ArraySliceBuiltinFn(node, lhs);
+        return new ArraySliceBuiltinFn(lhs);
       } else if (rhs === 'concat') {
-        return new ArrayConcatBuiltinFn(node, lhs);
+        return new ArrayConcatBuiltinFn(lhs);
       }
       if (typeof rhs !== 'number' || !Number.isInteger(rhs)) {
         return DynamicValue.fromInvalidExpressionType(node, rhs);
@@ -399,8 +406,8 @@ export class StaticInterpreter {
     }
 
     // If the call refers to a builtin function, attempt to evaluate the function.
-    if (lhs instanceof BuiltinFn) {
-      return lhs.evaluate(this.evaluateFunctionArguments(node, context));
+    if (lhs instanceof KnownFn) {
+      return lhs.evaluate(node, this.evaluateFunctionArguments(node, context));
     }
 
     if (!(lhs instanceof Reference)) {
@@ -410,12 +417,6 @@ export class StaticInterpreter {
     const fn = this.host.getDefinitionOfFunction(lhs.node);
     if (fn === null) {
       return DynamicValue.fromInvalidExpressionType(node.expression, lhs);
-    }
-
-    // If the function corresponds with a tslib helper function, evaluate it with custom logic.
-    if (fn.helper !== null) {
-      const args = this.evaluateFunctionArguments(node, context);
-      return evaluateTsHelperInline(fn.helper, node, args);
     }
 
     if (!isFunctionOrMethodReference(lhs)) {
@@ -499,7 +500,7 @@ export class StaticInterpreter {
       return DynamicValue.fromUnsupportedSyntax(node);
     }
 
-    const op = UNARY_OPERATORS.get(operatorKind) !;
+    const op = UNARY_OPERATORS.get(operatorKind)!;
     const value = this.visitExpression(node.operand, context);
     if (value instanceof DynamicValue) {
       return DynamicValue.fromDynamicInput(node, value);
@@ -514,11 +515,15 @@ export class StaticInterpreter {
       return DynamicValue.fromUnsupportedSyntax(node);
     }
 
-    const opRecord = BINARY_OPERATORS.get(tokenKind) !;
+    const opRecord = BINARY_OPERATORS.get(tokenKind)!;
     let lhs: ResolvedValue, rhs: ResolvedValue;
     if (opRecord.literal) {
-      lhs = literal(this.visitExpression(node.left, context), node.left);
-      rhs = literal(this.visitExpression(node.right, context), node.right);
+      lhs = literal(
+          this.visitExpression(node.left, context),
+          value => DynamicValue.fromInvalidExpressionType(node.left, value));
+      rhs = literal(
+          this.visitExpression(node.right, context),
+          value => DynamicValue.fromInvalidExpressionType(node.right, value));
     } else {
       lhs = this.visitExpression(node.left, context);
       rhs = this.visitExpression(node.right, context);
@@ -563,13 +568,29 @@ export class StaticInterpreter {
   private stringNameFromPropertyName(node: ts.PropertyName, context: Context): string|undefined {
     if (ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node)) {
       return node.text;
-    } else {  // ts.ComputedPropertyName
+    } else if (ts.isComputedPropertyName(node)) {
       const literal = this.visitExpression(node.expression, context);
       return typeof literal === 'string' ? literal : undefined;
+    } else {
+      return undefined;
     }
   }
 
-  private getReference(node: ts.Declaration, context: Context): Reference {
+  private getResolvedEnum(node: ts.Declaration, enumMembers: EnumMember[], context: Context):
+      ResolvedValue {
+    const enumRef = this.getReference(node, context);
+    const map = new Map<string, EnumValue>();
+    enumMembers.forEach(member => {
+      const name = this.stringNameFromPropertyName(member.name, context);
+      if (name !== undefined) {
+        const resolved = this.visit(member.initializer, context);
+        map.set(name, new EnumValue(enumRef, name, resolved));
+      }
+    });
+    return map;
+  }
+
+  private getReference<T extends ts.Declaration>(node: T, context: Context): Reference<T> {
     return new Reference(node, owningModule(context));
   }
 }
@@ -580,12 +601,16 @@ function isFunctionOrMethodReference(ref: Reference<ts.Node>):
       ts.isFunctionExpression(ref.node);
 }
 
-function literal(value: ResolvedValue, node: ts.Node): any {
+function literal(
+    value: ResolvedValue, reject: (value: ResolvedValue) => ResolvedValue): ResolvedValue {
+  if (value instanceof EnumValue) {
+    value = value.resolved;
+  }
   if (value instanceof DynamicValue || value === null || value === undefined ||
       typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
   }
-  return DynamicValue.fromInvalidExpressionType(node, value);
+  return reject(value);
 }
 
 function isVariableDeclarationDeclared(node: ts.VariableDeclaration): boolean {
@@ -617,7 +642,7 @@ function joinModuleContext(existing: Context, node: ts.Node, decl: Declaration):
   }
 }
 
-function owningModule(context: Context, override: OwningModule | null = null): OwningModule|null {
+function owningModule(context: Context, override: OwningModule|null = null): OwningModule|null {
   let specifier = context.absoluteModuleName;
   if (override !== null) {
     specifier = override.specifier;
@@ -630,4 +655,12 @@ function owningModule(context: Context, override: OwningModule | null = null): O
   } else {
     return null;
   }
+}
+
+/**
+ * Helper type guard to workaround a narrowing limitation in g3, where testing for
+ * `decl.node !== null` would not narrow `decl` to be of type `ConcreteDeclaration`.
+ */
+function isConcreteDeclaration(decl: Declaration): decl is ConcreteDeclaration {
+  return decl.node !== null;
 }

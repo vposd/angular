@@ -10,6 +10,12 @@ For an in-depth introduction to issues and techniques for designing accessible a
 This page discusses best practices for designing Angular applications that
 work well for all users, including those who rely on assistive technologies.
 
+<div class="alert is-helpful">
+
+  For the sample app that this page describes, see the <live-example></live-example>.
+
+</div>
+
 ## Accessibility attributes
 
 Building accessible web experience often involves setting [ARIA attributes](https://developers.google.com/web/fundamentals/accessibility/semantics-aria)
@@ -17,7 +23,7 @@ to provide semantic meaning where it might otherwise be missing.
 Use [attribute binding](guide/template-syntax#attribute-binding) template syntax to control the values of accessibility-related attributes.
 
 When binding to ARIA attributes in Angular, you must use the `attr.` prefix, as the ARIA
-specification depends specifically on HTML attributes rather than properties on DOM elements.
+specification depends specifically on HTML attributes rather than properties of DOM elements.
 
 ```html
 <!-- Use attr. when binding to an ARIA attribute -->
@@ -91,8 +97,6 @@ The following example shows how to make a simple progress bar accessible by usin
 
    <code-example path="accessibility/src/app/app.component.html" header="src/app/app.component.html" region="template"></code-example>
 
-
-To see the progress bar in a working example app, refer to the <live-example></live-example>.
 
 ## Routing and focus management
 

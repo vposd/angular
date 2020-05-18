@@ -8,13 +8,17 @@
 
 import * as ts from 'typescript';
 
-import {DependencyTracker} from '../../partial_evaluator';
-import {ResourceDependencyRecorder} from '../../util/src/resource_recorder';
+import {absoluteFrom, absoluteFromSourceFile, AbsoluteFsPath} from '../../file_system';
+import {ClassRecord, TraitCompiler} from '../../transform';
+import {FileTypeCheckingData} from '../../typecheck/src/context';
+import {IncrementalBuild} from '../api';
+
+import {FileDependencyGraph} from './dependency_tracking';
 
 /**
  * Drives an incremental build, by tracking changes and determining which files need to be emitted.
  */
-export class IncrementalDriver implements DependencyTracker, ResourceDependencyRecorder {
+export class IncrementalDriver implements IncrementalBuild<ClassRecord, FileTypeCheckingData> {
   /**
    * State of the current build.
    *
@@ -22,12 +26,9 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
    */
   private state: BuildState;
 
-  /**
-   * Tracks metadata related to each `ts.SourceFile` in the program.
-   */
-  private metadata = new Map<ts.SourceFile, FileMetadata>();
-
-  private constructor(state: PendingBuildState, private allTsFiles: Set<ts.SourceFile>) {
+  private constructor(
+      state: PendingBuildState, private allTsFiles: Set<ts.SourceFile>,
+      readonly depGraph: FileDependencyGraph, private logicalChanges: Set<string>|null) {
     this.state = state;
   }
 
@@ -53,15 +54,16 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
       state = {
         kind: BuildStateKind.Pending,
         pendingEmit: oldDriver.state.pendingEmit,
-        changedResourcePaths: new Set<string>(),
+        changedResourcePaths: new Set<AbsoluteFsPath>(),
         changedTsPaths: new Set<string>(),
+        lastGood: oldDriver.state.lastGood,
       };
     }
 
     // Merge the freshly modified resource files with any prior ones.
     if (modifiedResourceFiles !== null) {
       for (const resFile of modifiedResourceFiles) {
-        state.changedResourcePaths.add(resFile);
+        state.changedResourcePaths.add(absoluteFrom(resFile));
       }
     }
 
@@ -101,7 +103,7 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
       }
     }
 
-    // The last step is to remove any deleted files from the state.
+    // The next step is to remove any deleted files from the state.
     for (const filePath of deletedTsPaths) {
       state.pendingEmit.delete(filePath);
 
@@ -110,8 +112,39 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
       state.changedTsPaths.delete(filePath);
     }
 
-    // `state` now reflects the initial compilation state of the current
-    return new IncrementalDriver(state, new Set<ts.SourceFile>(tsOnlyFiles(newProgram)));
+    // Now, changedTsPaths contains physically changed TS paths. Use the previous program's logical
+    // dependency graph to determine logically changed files.
+    const depGraph = new FileDependencyGraph();
+
+    // If a previous compilation exists, use its dependency graph to determine the set of logically
+    // changed files.
+    let logicalChanges: Set<string>|null = null;
+    if (state.lastGood !== null) {
+      // Extract the set of logically changed files. At the same time, this operation populates the
+      // current (fresh) dependency graph with information about those files which have not
+      // logically changed.
+      logicalChanges = depGraph.updateWithPhysicalChanges(
+          state.lastGood.depGraph, state.changedTsPaths, deletedTsPaths,
+          state.changedResourcePaths);
+      for (const fileName of state.changedTsPaths) {
+        logicalChanges.add(fileName);
+      }
+
+      // Any logically changed files need to be re-emitted. Most of the time this would happen
+      // regardless because the new dependency graph would _also_ identify the file as stale.
+      // However there are edge cases such as removing a component from an NgModule without adding
+      // it to another one, where the previous graph identifies the file as logically changed, but
+      // the new graph (which does not have that edge) fails to identify that the file should be
+      // re-emitted.
+      for (const change of logicalChanges) {
+        state.pendingEmit.add(change);
+      }
+    }
+
+    // `state` now reflects the initial pending state of the current compilation.
+
+    return new IncrementalDriver(
+        state, new Set<ts.SourceFile>(tsOnlyFiles(newProgram)), depGraph, logicalChanges);
   }
 
   static fresh(program: ts.Program): IncrementalDriver {
@@ -122,14 +155,16 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
     const state: PendingBuildState = {
       kind: BuildStateKind.Pending,
       pendingEmit: new Set<string>(tsFiles.map(sf => sf.fileName)),
-      changedResourcePaths: new Set<string>(),
+      changedResourcePaths: new Set<AbsoluteFsPath>(),
       changedTsPaths: new Set<string>(),
+      lastGood: null,
     };
 
-    return new IncrementalDriver(state, new Set(tsFiles));
+    return new IncrementalDriver(
+        state, new Set(tsFiles), new FileDependencyGraph(), /* logicalChanges */ null);
   }
 
-  recordSuccessfulAnalysis(): void {
+  recordSuccessfulAnalysis(traitCompiler: TraitCompiler): void {
     if (this.state.kind !== BuildStateKind.Pending) {
       // Changes have already been incorporated.
       return;
@@ -140,12 +175,7 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
     const state: PendingBuildState = this.state;
 
     for (const sf of this.allTsFiles) {
-      // It's safe to skip emitting a file if:
-      // 1) it hasn't changed
-      // 2) none if its resource dependencies have changed
-      // 3) none of its source dependencies have changed
-      if (state.changedTsPaths.has(sf.fileName) || this.hasChangedResourceDependencies(sf) ||
-          this.getFileDependencies(sf).some(dep => state.changedTsPaths.has(dep.fileName))) {
+      if (this.depGraph.isStale(sf, state.changedTsPaths, state.changedResourcePaths)) {
         // Something has changed which requires this file be re-emitted.
         pendingEmit.add(sf.fileName);
       }
@@ -155,67 +185,72 @@ export class IncrementalDriver implements DependencyTracker, ResourceDependencyR
     this.state = {
       kind: BuildStateKind.Analyzed,
       pendingEmit,
+
+      // Since this compilation was successfully analyzed, update the "last good" artifacts to the
+      // ones from the current compilation.
+      lastGood: {
+        depGraph: this.depGraph,
+        traitCompiler: traitCompiler,
+        typeCheckingResults: null,
+      },
+
+      priorTypeCheckingResults:
+          this.state.lastGood !== null ? this.state.lastGood.typeCheckingResults : null,
     };
   }
 
-  recordSuccessfulEmit(sf: ts.SourceFile): void { this.state.pendingEmit.delete(sf.fileName); }
-
-  safeToSkipEmit(sf: ts.SourceFile): boolean { return !this.state.pendingEmit.has(sf.fileName); }
-
-  trackFileDependency(dep: ts.SourceFile, src: ts.SourceFile) {
-    const metadata = this.ensureMetadata(src);
-    metadata.fileDependencies.add(dep);
+  recordSuccessfulTypeCheck(results: Map<AbsoluteFsPath, FileTypeCheckingData>): void {
+    if (this.state.lastGood === null || this.state.kind !== BuildStateKind.Analyzed) {
+      return;
+    }
+    this.state.lastGood.typeCheckingResults = results;
   }
 
-  trackFileDependencies(deps: ts.SourceFile[], src: ts.SourceFile) {
-    const metadata = this.ensureMetadata(src);
-    for (const dep of deps) {
-      metadata.fileDependencies.add(dep);
+  recordSuccessfulEmit(sf: ts.SourceFile): void {
+    this.state.pendingEmit.delete(sf.fileName);
+  }
+
+  safeToSkipEmit(sf: ts.SourceFile): boolean {
+    return !this.state.pendingEmit.has(sf.fileName);
+  }
+
+  priorWorkFor(sf: ts.SourceFile): ClassRecord[]|null {
+    if (this.state.lastGood === null || this.logicalChanges === null) {
+      // There is no previous good build, so no prior work exists.
+      return null;
+    } else if (this.logicalChanges.has(sf.fileName)) {
+      // Prior work might exist, but would be stale as the file in question has logically changed.
+      return null;
+    } else {
+      // Prior work might exist, and if it does then it's usable!
+      return this.state.lastGood.traitCompiler.recordsFor(sf);
     }
   }
 
-  getFileDependencies(file: ts.SourceFile): ts.SourceFile[] {
-    if (!this.metadata.has(file)) {
-      return [];
+  priorTypeCheckingResultsFor(sf: ts.SourceFile): FileTypeCheckingData|null {
+    if (this.state.kind !== BuildStateKind.Analyzed ||
+        this.state.priorTypeCheckingResults === null || this.logicalChanges === null) {
+      return null;
     }
-    const meta = this.metadata.get(file) !;
-    return Array.from(meta.fileDependencies);
-  }
 
-  recordResourceDependency(file: ts.SourceFile, resourcePath: string): void {
-    const metadata = this.ensureMetadata(file);
-    metadata.resourcePaths.add(resourcePath);
-  }
-
-  private ensureMetadata(sf: ts.SourceFile): FileMetadata {
-    const metadata = this.metadata.get(sf) || new FileMetadata();
-    this.metadata.set(sf, metadata);
-    return metadata;
-  }
-
-  private hasChangedResourceDependencies(sf: ts.SourceFile): boolean {
-    if (!this.metadata.has(sf)) {
-      return false;
+    if (this.logicalChanges.has(sf.fileName)) {
+      return null;
     }
-    const resourceDeps = this.metadata.get(sf) !.resourcePaths;
-    return Array.from(resourceDeps.keys())
-        .some(
-            resourcePath => this.state.kind === BuildStateKind.Pending &&
-                this.state.changedResourcePaths.has(resourcePath));
+
+    const fileName = absoluteFromSourceFile(sf);
+    if (!this.state.priorTypeCheckingResults.has(fileName)) {
+      return null;
+    }
+    const data = this.state.priorTypeCheckingResults.get(fileName)!;
+    if (data.hasInlines) {
+      return null;
+    }
+
+    return data;
   }
 }
 
-/**
- * Information about the whether a source file can have analysis or emission can be skipped.
- */
-class FileMetadata {
-  /** A set of source files that this file depends upon. */
-  fileDependencies = new Set<ts.SourceFile>();
-  resourcePaths = new Set<string>();
-}
-
-
-type BuildState = PendingBuildState | AnalyzedBuildState;
+type BuildState = PendingBuildState|AnalyzedBuildState;
 
 enum BuildStateKind {
   Pending,
@@ -235,7 +270,8 @@ interface BaseBuildState {
    * After analysis, it's updated to include any files which might have changed and need a re-emit
    * as a result of incremental changes.
    *
-   * If an emit happens, any written files are removed from the `Set`, as they're no longer pending.
+   * If an emit happens, any written files are removed from the `Set`, as they're no longer
+   * pending.
    *
    * Thus, after compilation `pendingEmit` should be empty (on a successful build) or contain the
    * files which still need to be emitted but have not yet been (due to errors).
@@ -247,6 +283,31 @@ interface BaseBuildState {
    * See the README.md for more information on this algorithm.
    */
   pendingEmit: Set<string>;
+
+
+  /**
+   * Specific aspects of the last compilation which successfully completed analysis, if any.
+   */
+  lastGood: {
+    /**
+     * The dependency graph from the last successfully analyzed build.
+     *
+     * This is used to determine the logical impact of physical file changes.
+     */
+    depGraph: FileDependencyGraph;
+
+    /**
+     * The `TraitCompiler` from the last successfully analyzed build.
+     *
+     * This is used to extract "prior work" which might be reusable in this compilation.
+     */
+    traitCompiler: TraitCompiler;
+
+    /**
+     * Type checking results which will be passed onto the next build.
+     */
+    typeCheckingResults: Map<AbsoluteFsPath, FileTypeCheckingData>| null;
+  }|null;
 }
 
 /**
@@ -271,7 +332,7 @@ interface PendingBuildState extends BaseBuildState {
   /**
    * Set of resource file paths which have changed since the last successfully analyzed build.
    */
-  changedResourcePaths: Set<string>;
+  changedResourcePaths: Set<AbsoluteFsPath>;
 }
 
 interface AnalyzedBuildState extends BaseBuildState {
@@ -285,6 +346,11 @@ interface AnalyzedBuildState extends BaseBuildState {
    * analyzed build.
    */
   pendingEmit: Set<string>;
+
+  /**
+   * Type checking results from the previous compilation, which can be reused in this one.
+   */
+  priorTypeCheckingResults: Map<AbsoluteFsPath, FileTypeCheckingData>|null;
 }
 
 function tsOnlyFiles(program: ts.Program): ReadonlyArray<ts.SourceFile> {

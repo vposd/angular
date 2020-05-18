@@ -7,7 +7,7 @@
  */
 import * as ts from 'typescript';
 
-import {AbsoluteFsPath, NgtscCompilerHost, absoluteFrom, getFileSystem} from '../../../src/ngtsc/file_system';
+import {absoluteFrom, AbsoluteFsPath, getFileSystem, NgtscCompilerHost} from '../../../src/ngtsc/file_system';
 import {TestFile} from '../../../src/ngtsc/file_system/testing';
 import {BundleProgram, makeBundleProgram} from '../../src/packages/bundle_program';
 import {NgccEntryPointConfig} from '../../src/packages/configuration';
@@ -39,13 +39,23 @@ export function makeTestEntryPoint(
  */
 export function makeTestEntryPointBundle(
     packageName: string, format: EntryPointFormat, isCore: boolean, srcRootNames: AbsoluteFsPath[],
-    dtsRootNames?: AbsoluteFsPath[], config?: TestConfig): EntryPointBundle {
+    dtsRootNames?: AbsoluteFsPath[], config?: TestConfig,
+    enableI18nLegacyMessageIdFormat = false): EntryPointBundle {
   const entryPoint = makeTestEntryPoint(packageName, packageName, config);
   const src = makeTestBundleProgram(srcRootNames[0], isCore);
   const dts =
       dtsRootNames ? makeTestDtsBundleProgram(dtsRootNames[0], entryPoint.package, isCore) : null;
   const isFlatCore = isCore && src.r3SymbolsFile === null;
-  return {entryPoint, format, rootDirs: [absoluteFrom('/')], src, dts, isCore, isFlatCore};
+  return {
+    entryPoint,
+    format,
+    rootDirs: [absoluteFrom('/')],
+    src,
+    dts,
+    isCore,
+    isFlatCore,
+    enableI18nLegacyMessageIdFormat
+  };
 }
 
 export function makeTestBundleProgram(

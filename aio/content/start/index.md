@@ -1,13 +1,12 @@
-# Getting Started with Angular: Your First App
+# Part 1: Getting started with a basic Angular app
 
 Welcome to Angular!
 
 This tutorial introduces you to the essentials of Angular by walking you through a simple e-commerce site with a catalog, shopping cart, and check-out form.
-To help you get started right away, this guide uses a simple ready-made application that you can examine and play with interactively.
+To help you get started right away, this guide uses a simple ready-made application that you can examine and modify interactively (without having to [set up a local work environment](guide/setup-local "Setup guide")).
 
 <div class="callout is-helpful">
 <header>New to web development?</header>
-
 
  There are many resources to complement the Angular docs. Mozilla's MDN docs include both [HTML](https://developer.mozilla.org/en-US/docs/Learn/HTML "Learning HTML: Guides and tutorials") and [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript "JavaScript") introductions. [TypeScript's docs](https://www.typescriptlang.org/docs/home.html "TypeScript documentation") include a 5-minute tutorial. Various online course platforms, such as [Udemy](http://www.udemy.com "Udemy online courses") and [Codecademy](https://www.codecademy.com/ "Codecademy online courses"), also cover web development basics.
 
@@ -15,7 +14,7 @@ To help you get started right away, this guide uses a simple ready-made applicat
 
 
 {@a new-project}
-## Create a new project
+## Create the sample project
 
 <h4>
 <live-example name="getting-started-v0" noDownload>Click here to create the ready-made sample project in StackBlitz.</live-example>
@@ -50,14 +49,19 @@ expect, save and then click the refresh button.
 * StackBlitz is continually improving, so there may be
 slight differences in generated code, but the app's
 behavior will be the same.
+* When you generate the StackBlitz example apps that
+accompany the tutorials, StackBlitz creates the starter
+files and mock data for you. The files you'll use throughout
+the tutorials are in the `src` folder of the StackBlitz
+example apps.
 
 </div>
 
-<div class="alert is-helpful">
+<div class="alert is-important">
 
 If you go directly to the [StackBlitz online development environment](https://stackblitz.com/) and choose to [start a new Angular workspace](https://stackblitz.com/fork/angular), you get a generic stub application, rather than this [illustrative sample](#new-project). Once you have been introduced to the basic concepts here, this can be helpful for working interactively while you are learning Angular.
 
-In actual development you will typically use the [Angular CLI](guide/glossary#command-line-interface-cli), a powerful command-line tool that lets you generate and modify applications. For more information, see the [CLI Overview](cli).
+In actual development you will typically use the [Angular CLI](guide/glossary#command-line-interface-cli "Definition of CLI"), a powerful command-line tool that lets you generate and modify applications. For a full step-by-step guide that shows how to use the CLI to create a new project and all of its parts, see [Tutorial: Tour of Heroes](tutorial).
 
 </div>
 
@@ -70,7 +74,7 @@ This section introduces template syntax by enhancing the "Products" area.
 
 <div class="alert is-helpful">
 
-To help you get going, the following steps use predefined product data and methods from the `product-list.component.ts` file.
+To help you get going, the following steps use predefined product data from the `products.ts` file (already created in StackBlitz example) and methods from the `product-list.component.ts` file.
 
 </div>
 
@@ -87,7 +91,7 @@ To help you get going, the following steps use predefined product data and metho
 
       <div class="alert is-helpful">
 
-      `*ngFor` is a "structural directive". Structural directives shape or reshape the DOM's structure, typically by adding, removing, and manipulating the elements to which they are attached. Any directive with an asterisk, `*`, is a structural directive.
+      `*ngFor` is a "structural directive". Structural directives shape or reshape the DOM's structure, typically by adding, removing, and manipulating the elements to which they are attached. Directives with an asterisk, `*`, are structural directives.
 
       </div>
 
@@ -158,8 +162,7 @@ In the process, you've learned to use five common features of Angular's template
 
 <div class="alert is-helpful">
 
-For more information about the full capabilities of Angular's
-template syntax, see [Template Syntax](guide/template-syntax "Template Syntax").
+For a fuller introduction to Angular's template syntax, see [Introduction to components and templates](guide/architecture-components#template-syntax "Template Syntax").
 
 </div>
 
@@ -213,7 +216,7 @@ The next section expands the app's capabilities by adding a new component&mdash;
 
 <div class="alert is-helpful">
 
-For more information about components and how they interact with templates, see [Introduction to Components](guide/architecture-components "Architecture > Introduction to Components").
+For more information about components and how they interact with templates, see [Introduction to Components](guide/architecture-components "Concepts > Introduction to Components and Templates").
 
 </div>
 
@@ -255,11 +258,11 @@ The next step is to create a new alert feature that takes a product as an input.
 
     1. Import `Input` from `@angular/core`.
 
-        <code-example path="getting-started/src/app/product-alerts/product-alerts.component.1.ts" region="imports" header="src/app/product-list/product-alerts.component.ts"></code-example>
+        <code-example path="getting-started/src/app/product-alerts/product-alerts.component.1.ts" region="imports" header="src/app/product-alerts/product-alerts.component.ts"></code-example>
 
     1. In the `ProductAlertsComponent` class definition, define a property named `product` with an `@Input()` decorator. The `@Input()` decorator indicates that the property value passes in from the component's parent, the product list component.
 
-        <code-example path="getting-started/src/app/product-alerts/product-alerts.component.1.ts" region="input-decorator" header="src/app/product-list/product-alerts.component.ts"></code-example>
+        <code-example path="getting-started/src/app/product-alerts/product-alerts.component.1.ts" region="input-decorator" header="src/app/product-alerts/product-alerts.component.ts"></code-example>
 
 1. Define the view for the new product alert component.
 
@@ -306,6 +309,13 @@ To make the "Notify Me" button work, you need to configure two things:
 
 1. In the component class, define a property named `notify` with an `@Output()` decorator and an instance of `EventEmitter()`. This allows the product alert component to emit an event when the value of the notify property changes.
 
+<div class="alert is-helpful">
+
+  When the Angular CLI generates a new component, it includes an empty constructor, the `OnInit` interface, and the `ngOnInit()` method.
+  Since the following example isn't using them, they are omitted here for brevity.
+
+</div>
+
     <code-example path="getting-started/src/app/product-alerts/product-alerts.component.ts" header="src/app/product-alerts/product-alerts.component.ts" region="input-output"></code-example>
 
 1. In the product alert template, `product-alerts.component.html`, update the "Notify Me" button with an event binding to call the `notify.emit()` method.
@@ -346,5 +356,5 @@ You've learned about the foundation of Angular: components and template syntax.
 You've also learned how the component class and template interact, and how components communicate with each other.
 
 To continue exploring Angular, choose either of the following options:
-* [Continue to the "Routing" section](start/routing "Getting Started: Routing") to create a product details page that can be accessed by clicking a product name and that has its own URL pattern.
-* [Skip ahead to the "Deployment" section](start/deployment "Getting Started: Deployment") to move to local development, or deploy your app to Firebase or your own server.
+* [Continue to the "In-app navigation" section](start/start-routing "Try it: In-app navigation") to create a product details page that can be accessed by clicking a product name and that has its own URL pattern.
+* [Skip ahead to the "Deployment" section](start/start-deployment "Try it: Deployment") to move to local development, or deploy your app to Firebase or your own server.

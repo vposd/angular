@@ -12,9 +12,9 @@ import {mapLiteral} from '../output/map_util';
 import * as o from '../output/output_ast';
 import {OutputContext} from '../util';
 
-import {R3DependencyMetadata, R3FactoryTarget, compileFactoryFunction} from './r3_factory';
+import {compileFactoryFunction, R3DependencyMetadata, R3FactoryTarget} from './r3_factory';
 import {Identifiers as R3} from './r3_identifiers';
-import {R3Reference, convertMetaToOutput, jitOnlyGuardedExpression, mapToMapExpression} from './util';
+import {convertMetaToOutput, jitOnlyGuardedExpression, mapToMapExpression, R3Reference} from './util';
 
 export interface R3NgModuleDef {
   expression: o.Expression;
@@ -29,7 +29,7 @@ export interface R3NgModuleMetadata {
   /**
    * An expression representing the module type being compiled.
    */
-  type: o.Expression;
+  type: R3Reference;
 
   /**
    * An expression representing the module type being compiled, intended for use within a class
@@ -108,9 +108,7 @@ export function compileNgModule(meta: R3NgModuleMetadata): R3NgModuleDef {
   } = meta;
 
   const additionalStatements: o.Statement[] = [];
-  const definitionMap = {
-    type: internalType
-  } as{
+  const definitionMap = {type: internalType} as {
     type: o.Expression,
     bootstrap: o.Expression,
     declarations: o.Expression,
@@ -160,7 +158,7 @@ export function compileNgModule(meta: R3NgModuleMetadata): R3NgModuleDef {
 
   const expression = o.importExpr(R3.defineNgModule).callFn([mapToMapExpression(definitionMap)]);
   const type = new o.ExpressionType(o.importExpr(R3.NgModuleDefWithMeta, [
-    new o.ExpressionType(moduleType), tupleTypeOf(declarations), tupleTypeOf(imports),
+    new o.ExpressionType(moduleType.type), tupleTypeOf(declarations), tupleTypeOf(imports),
     tupleTypeOf(exports)
   ]));
 
@@ -177,7 +175,7 @@ export function compileNgModule(meta: R3NgModuleMetadata): R3NgModuleDef {
 function generateSetNgModuleScopeCall(meta: R3NgModuleMetadata): o.Statement|null {
   const {adjacentType: moduleType, declarations, imports, exports, containsForwardDecls} = meta;
 
-  const scopeMap = {} as{
+  const scopeMap = {} as {
     declarations: o.Expression,
     imports: o.Expression,
     exports: o.Expression,
@@ -228,7 +226,7 @@ export interface R3InjectorDef {
 
 export interface R3InjectorMetadata {
   name: string;
-  type: o.Expression;
+  type: R3Reference;
   internalType: o.Expression;
   deps: R3DependencyMetadata[]|null;
   providers: o.Expression|null;
@@ -247,7 +245,7 @@ export function compileInjector(meta: R3InjectorMetadata): R3InjectorDef {
   });
   const definitionMap = {
     factory: result.factory,
-  } as{factory: o.Expression, providers: o.Expression, imports: o.Expression};
+  } as {factory: o.Expression, providers: o.Expression, imports: o.Expression};
 
   if (meta.providers !== null) {
     definitionMap.providers = meta.providers;
@@ -259,7 +257,7 @@ export function compileInjector(meta: R3InjectorMetadata): R3InjectorDef {
 
   const expression = o.importExpr(R3.defineInjector).callFn([mapToMapExpression(definitionMap)]);
   const type =
-      new o.ExpressionType(o.importExpr(R3.InjectorDef, [new o.ExpressionType(meta.type)]));
+      new o.ExpressionType(o.importExpr(R3.InjectorDef, [new o.ExpressionType(meta.type.type)]));
   return {expression, type, statements: result.statements};
 }
 
@@ -267,7 +265,7 @@ export function compileInjector(meta: R3InjectorMetadata): R3InjectorDef {
 export function compileNgModuleFromRender2(
     ctx: OutputContext, ngModule: CompileShallowModuleMetadata,
     injectableCompiler: InjectableCompiler): void {
-  const className = identifierName(ngModule.type) !;
+  const className = identifierName(ngModule.type)!;
 
   const rawImports = ngModule.rawImports ? [ngModule.rawImports] : [];
   const rawExports = ngModule.rawExports ? [ngModule.rawExports] : [];
@@ -288,7 +286,8 @@ export function compileNgModuleFromRender2(
           /* name */ 'ɵinj',
           /* type */ o.INFERRED_TYPE,
           /* modifiers */[o.StmtModifier.Static],
-          /* initializer */ injectorDef, )],
+          /* initializer */ injectorDef,
+          )],
       /* getters */[],
       /* constructorMethod */ new o.ClassMethod(null, [], []),
       /* methods */[]));

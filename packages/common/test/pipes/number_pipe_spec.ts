@@ -6,13 +6,14 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {CurrencyPipe, DecimalPipe, PercentPipe} from '@angular/common';
+import localeAr from '@angular/common/locales/ar';
+import localeDa from '@angular/common/locales/da';
+import localeDeAt from '@angular/common/locales/de-AT';
 import localeEn from '@angular/common/locales/en';
 import localeEsUS from '@angular/common/locales/es-US';
 import localeFr from '@angular/common/locales/fr';
-import localeAr from '@angular/common/locales/ar';
-import localeDeAt from '@angular/common/locales/de-AT';
-import {ɵunregisterLocaleData, ɵregisterLocaleData} from '@angular/core';
-import {CurrencyPipe, DecimalPipe, PercentPipe} from '@angular/common';
+import {ɵregisterLocaleData, ɵunregisterLocaleData} from '@angular/core';
 import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testing_internal';
 
 {
@@ -23,6 +24,7 @@ import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testin
       ɵregisterLocaleData(localeFr);
       ɵregisterLocaleData(localeAr);
       ɵregisterLocaleData(localeDeAt);
+      ɵregisterLocaleData(localeDa);
     });
 
     afterAll(() => ɵunregisterLocaleData());
@@ -30,7 +32,9 @@ import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testin
     describe('DecimalPipe', () => {
       describe('transform', () => {
         let pipe: DecimalPipe;
-        beforeEach(() => { pipe = new DecimalPipe('en-US'); });
+        beforeEach(() => {
+          pipe = new DecimalPipe('en-US');
+        });
 
         it('should return correct value for numbers', () => {
           expect(pipe.transform(12345)).toEqual('12,345');
@@ -66,7 +70,9 @@ import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testin
     describe('PercentPipe', () => {
       let pipe: PercentPipe;
 
-      beforeEach(() => { pipe = new PercentPipe('en-US'); });
+      beforeEach(() => {
+        pipe = new PercentPipe('en-US');
+      });
 
       describe('transform', () => {
         it('should return correct value for numbers', () => {
@@ -87,7 +93,9 @@ import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testin
     describe('CurrencyPipe', () => {
       let pipe: CurrencyPipe;
 
-      beforeEach(() => { pipe = new CurrencyPipe('en-US'); });
+      beforeEach(() => {
+        pipe = new CurrencyPipe('en-US', 'USD');
+      });
 
       describe('transform', () => {
         it('should return correct value for numbers', () => {
@@ -95,6 +103,7 @@ import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testin
           expect(pipe.transform(12, 'EUR', 'code', '.1')).toEqual('EUR12.0');
           expect(pipe.transform(5.1234, 'USD', 'code', '.0-3')).toEqual('USD5.123');
           expect(pipe.transform(5.1234, 'USD', 'code')).toEqual('USD5.12');
+          expect(pipe.transform(5.1234, 'USD', '')).toEqual('5.12');
           expect(pipe.transform(5.1234, 'USD', 'symbol')).toEqual('$5.12');
           expect(pipe.transform(5.1234, 'CAD', 'symbol')).toEqual('CA$5.12');
           expect(pipe.transform(5.1234, 'CAD', 'symbol-narrow')).toEqual('$5.12');
@@ -104,6 +113,8 @@ import {beforeEach, describe, expect, it} from '@angular/core/testing/src/testin
           expect(pipe.transform(5, 'USD', 'symbol', '', 'fr')).toEqual('5,00 $US');
           expect(pipe.transform(123456789, 'EUR', 'symbol', '', 'de-at'))
               .toEqual('€ 123.456.789,00');
+          expect(pipe.transform(5.1234, 'EUR', '', '', 'de-at')).toEqual('5,12');
+          expect(pipe.transform(5.1234, 'DKK', '', '', 'da')).toEqual('5,12');
         });
 
         it('should support any currency code name', () => {

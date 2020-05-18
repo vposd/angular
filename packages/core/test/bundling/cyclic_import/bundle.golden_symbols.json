@@ -1,8 +1,5 @@
 [
   {
-    "name": "ACTIVE_INDEX"
-  },
-  {
     "name": "BLOOM_MASK"
   },
   {
@@ -43,6 +40,9 @@
   },
   {
     "name": "FLAGS"
+  },
+  {
+    "name": "HAS_TRANSPLANTED_VIEWS"
   },
   {
     "name": "HEADER_OFFSET"
@@ -114,10 +114,10 @@
     "name": "RENDERER_FACTORY"
   },
   {
-    "name": "RendererStyleFlags3"
+    "name": "SANITIZER"
   },
   {
-    "name": "SANITIZER"
+    "name": "TRANSPLANTED_VIEWS_TO_REFRESH"
   },
   {
     "name": "TVIEW"
@@ -156,7 +156,7 @@
     "name": "addComponentLogic"
   },
   {
-    "name": "addItemToStylingMap"
+    "name": "addHostBindingsToExpandoInstructions"
   },
   {
     "name": "addToViewTree"
@@ -165,13 +165,13 @@
     "name": "allocLFrame"
   },
   {
-    "name": "allocStylingMapArray"
-  },
-  {
     "name": "appendChild"
   },
   {
     "name": "attachPatchData"
+  },
+  {
+    "name": "autoRegisterModuleById"
   },
   {
     "name": "baseResolveDirective"
@@ -189,7 +189,13 @@
     "name": "callHooks"
   },
   {
-    "name": "concatString"
+    "name": "classIndexOf"
+  },
+  {
+    "name": "computeStaticStyling"
+  },
+  {
+    "name": "concatStringsWithSpace"
   },
   {
     "name": "createDirectivesInstances"
@@ -240,6 +246,9 @@
     "name": "elementCreate"
   },
   {
+    "name": "elementStartFirstCreatePass"
+  },
+  {
     "name": "enterDI"
   },
   {
@@ -250,9 +259,6 @@
   },
   {
     "name": "executeContentQueries"
-  },
-  {
-    "name": "executeElementExitFn"
   },
   {
     "name": "executeInitAndCheckHooks"
@@ -273,10 +279,7 @@
     "name": "findAttrIndexInNode"
   },
   {
-    "name": "findDirectiveMatches"
-  },
-  {
-    "name": "forceStylesAsString"
+    "name": "findDirectiveDefMatches"
   },
   {
     "name": "generateExpandoInstructionBlock"
@@ -312,6 +315,9 @@
     "name": "getContainerRenderParent"
   },
   {
+    "name": "getCurrentDirectiveIndex"
+  },
+  {
     "name": "getDirectiveDef"
   },
   {
@@ -324,10 +330,10 @@
     "name": "getFactoryDef"
   },
   {
-    "name": "getFirstNativeNode"
+    "name": "getFirstLContainer"
   },
   {
-    "name": "getInitialStylingValue"
+    "name": "getFirstNativeNode"
   },
   {
     "name": "getInjectorIndex"
@@ -345,12 +351,6 @@
     "name": "getLViewParent"
   },
   {
-    "name": "getMapProp"
-  },
-  {
-    "name": "getMapValue"
-  },
-  {
     "name": "getNameOnlyMarkerIndex"
   },
   {
@@ -361,6 +361,12 @@
   },
   {
     "name": "getNativeByTNode"
+  },
+  {
+    "name": "getNearestLContainer"
+  },
+  {
+    "name": "getNextLContainer"
   },
   {
     "name": "getNodeInjectable"
@@ -399,10 +405,10 @@
     "name": "getSelectedIndex"
   },
   {
-    "name": "getStylingMapArray"
+    "name": "getTView"
   },
   {
-    "name": "hasActiveElementFlag"
+    "name": "growHostVarsSpace"
   },
   {
     "name": "hasClassInput"
@@ -417,22 +423,16 @@
     "name": "hasTagAndTypeMatch"
   },
   {
-    "name": "hyphenate"
-  },
-  {
     "name": "includeViewProviders"
   },
   {
     "name": "increaseElementDepthCount"
   },
   {
-    "name": "incrementActiveDirectiveId"
-  },
-  {
     "name": "incrementInitPhaseFlags"
   },
   {
-    "name": "initNodeFlags"
+    "name": "initTNodeFlags"
   },
   {
     "name": "initializeInputAndOutputAliases"
@@ -477,6 +477,9 @@
     "name": "isFactory"
   },
   {
+    "name": "isInlineTemplate"
+  },
+  {
     "name": "isLContainer"
   },
   {
@@ -498,22 +501,13 @@
     "name": "isProceduralRenderer"
   },
   {
-    "name": "isRootView"
-  },
-  {
-    "name": "isStylingContext"
-  },
-  {
-    "name": "isStylingValueDefined"
-  },
-  {
     "name": "leaveDI"
   },
   {
     "name": "leaveView"
   },
   {
-    "name": "leaveViewProcessExit"
+    "name": "leaveViewLight"
   },
   {
     "name": "locateHostElement"
@@ -522,7 +516,16 @@
     "name": "markAsComponentHost"
   },
   {
+    "name": "markTransplantedViewsForRefresh"
+  },
+  {
     "name": "matchTemplateAttribute"
+  },
+  {
+    "name": "mergeHostAttribute"
+  },
+  {
+    "name": "mergeHostAttrs"
   },
   {
     "name": "nativeAppendChild"
@@ -543,28 +546,22 @@
     "name": "noSideEffects"
   },
   {
-    "name": "objectToClassName"
-  },
-  {
     "name": "refreshChildComponents"
   },
   {
     "name": "refreshComponent"
   },
   {
+    "name": "refreshContainsDirtyView"
+  },
+  {
     "name": "refreshContentQueries"
   },
   {
-    "name": "refreshDynamicEmbeddedViews"
-  },
-  {
-    "name": "refreshTransplantedViews"
+    "name": "refreshEmbeddedViews"
   },
   {
     "name": "refreshView"
-  },
-  {
-    "name": "registerInitialStylingOnTNode"
   },
   {
     "name": "registerPostOrderHooks"
@@ -582,13 +579,7 @@
     "name": "renderComponent"
   },
   {
-    "name": "renderInitialStyling"
-  },
-  {
     "name": "renderStringify"
-  },
-  {
-    "name": "renderStylingMap"
   },
   {
     "name": "renderView"
@@ -606,37 +597,25 @@
     "name": "saveResolvedLocalsInData"
   },
   {
-    "name": "selectClassBasedInputName"
-  },
-  {
     "name": "selectIndexInternal"
-  },
-  {
-    "name": "setActiveHostElement"
   },
   {
     "name": "setBindingIndex"
   },
   {
-    "name": "setBindingRoot"
+    "name": "setBindingRootForHostBindings"
   },
   {
-    "name": "setClass"
-  },
-  {
-    "name": "setClassName"
-  },
-  {
-    "name": "setCurrentDirectiveDef"
+    "name": "setCurrentDirectiveIndex"
   },
   {
     "name": "setCurrentQueryIndex"
   },
   {
-    "name": "setDirectiveStylingInput"
+    "name": "setDirectiveInputsWhichShadowsStyling"
   },
   {
-    "name": "setHostBindings"
+    "name": "setHostBindingsByExecutingExpandoInstructions"
   },
   {
     "name": "setIncludeViewProviders"
@@ -654,28 +633,16 @@
     "name": "setIsNotParent"
   },
   {
-    "name": "setMapValue"
-  },
-  {
     "name": "setPreviousOrParentTNode"
   },
   {
     "name": "setSelectedIndex"
   },
   {
-    "name": "setStyle"
-  },
-  {
-    "name": "setStyleAttr"
-  },
-  {
     "name": "setUpAttributes"
   },
   {
     "name": "stringifyForError"
-  },
-  {
-    "name": "stylingMapToString"
   },
   {
     "name": "syncViewWithBlueprint"
@@ -687,13 +654,16 @@
     "name": "unwrapRNode"
   },
   {
-    "name": "updateRawValueOnContext"
+    "name": "updateTransplantedViewCount"
   },
   {
     "name": "viewAttachedToChangeDetector"
   },
   {
-    "name": "writeStylingValueDirectly"
+    "name": "writeDirectClass"
+  },
+  {
+    "name": "writeDirectStyle"
   },
   {
     "name": "ɵɵdefineComponent"

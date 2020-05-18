@@ -16,13 +16,13 @@ import {DEFAULT_INTERPOLATION_CONFIG, InterpolationConfig} from './ml_parser/int
 import {DeclareVarStmt, Expression, LiteralExpr, Statement, StmtModifier, WrappedNodeExpr} from './output/output_ast';
 import {JitEvaluator} from './output/output_jit';
 import {ParseError, ParseSourceSpan, r3JitTypeSourceSpan} from './parse_util';
-import {R3DependencyMetadata, R3FactoryTarget, R3ResolvedDependencyType, compileFactoryFunction} from './render3/r3_factory';
+import {compileFactoryFunction, R3DependencyMetadata, R3FactoryTarget, R3ResolvedDependencyType} from './render3/r3_factory';
 import {R3JitReflector} from './render3/r3_jit';
-import {R3InjectorMetadata, R3NgModuleMetadata, compileInjector, compileNgModule} from './render3/r3_module_compiler';
-import {R3PipeMetadata, compilePipeFromMetadata} from './render3/r3_pipe_compiler';
+import {compileInjector, compileNgModule, R3InjectorMetadata, R3NgModuleMetadata} from './render3/r3_module_compiler';
+import {compilePipeFromMetadata, R3PipeMetadata} from './render3/r3_pipe_compiler';
 import {R3Reference} from './render3/util';
 import {R3DirectiveMetadata, R3QueryMetadata} from './render3/view/api';
-import {ParsedHostBindings, compileComponentFromMetadata, compileDirectiveFromMetadata, parseHostBindings, verifyHostBindings} from './render3/view/compiler';
+import {compileComponentFromMetadata, compileDirectiveFromMetadata, ParsedHostBindings, parseHostBindings, verifyHostBindings} from './render3/view/compiler';
 import {makeBindingParser, parseTemplate} from './render3/view/template';
 import {ResourceLoader} from './resource_loader';
 import {DomElementSchemaRegistry} from './schema/dom_element_schema_registry';
@@ -39,7 +39,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
       any {
     const metadata: R3PipeMetadata = {
       name: facade.name,
-      type: new WrappedNodeExpr(facade.type),
+      type: wrapReference(facade.type),
       internalType: new WrappedNodeExpr(facade.type),
       typeArgumentCount: facade.typeArgumentCount,
       deps: convertR3DependencyMetadataArray(facade.deps),
@@ -55,7 +55,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
       facade: R3InjectableMetadataFacade): any {
     const {expression, statements} = compileInjectable({
       name: facade.name,
-      type: new WrappedNodeExpr(facade.type),
+      type: wrapReference(facade.type),
       internalType: new WrappedNodeExpr(facade.type),
       typeArgumentCount: facade.typeArgumentCount,
       providedIn: computeProvidedIn(facade.providedIn),
@@ -74,7 +74,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
       facade: R3InjectorMetadataFacade): any {
     const meta: R3InjectorMetadata = {
       name: facade.name,
-      type: new WrappedNodeExpr(facade.type),
+      type: wrapReference(facade.type),
       internalType: new WrappedNodeExpr(facade.type),
       deps: convertR3DependencyMetadataArray(facade.deps),
       providers: new WrappedNodeExpr(facade.providers),
@@ -88,7 +88,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
       angularCoreEnv: CoreEnvironment, sourceMapUrl: string,
       facade: R3NgModuleMetadataFacade): any {
     const meta: R3NgModuleMetadata = {
-      type: new WrappedNodeExpr(facade.type),
+      type: wrapReference(facade.type),
       internalType: new WrappedNodeExpr(facade.type),
       adjacentType: new WrappedNodeExpr(facade.type),
       bootstrap: facade.bootstrap.map(wrapReference),
@@ -142,7 +142,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
       selector: facade.selector || this.elementSchemaRegistry.getDefaultComponentElementName(),
       template,
       wrapDirectivesAndPipesInClosure: false,
-      styles: facade.styles || [],
+      styles: [...facade.styles, ...template.styles],
       encapsulation: facade.encapsulation as any,
       interpolation: interpolationConfig,
       changeDetection: facade.changeDetection,
@@ -163,7 +163,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
       angularCoreEnv: CoreEnvironment, sourceMapUrl: string, meta: R3FactoryDefMetadataFacade) {
     const factoryRes = compileFactoryFunction({
       name: meta.name,
-      type: new WrappedNodeExpr(meta.type),
+      type: wrapReference(meta.type),
       internalType: new WrappedNodeExpr(meta.type),
       typeArgumentCount: meta.typeArgumentCount,
       deps: convertR3DependencyMetadataArray(meta.deps),
@@ -252,7 +252,7 @@ function convertDirectiveFacadeToMetadata(facade: R3DirectiveMetadataFacade): R3
   return {
     ...facade as R3DirectiveMetadataFacadeNoPropAndWhitespace,
     typeSourceSpan: facade.typeSourceSpan,
-    type: new WrappedNodeExpr(facade.type),
+    type: wrapReference(facade.type),
     internalType: new WrappedNodeExpr(facade.type),
     deps: convertR3DependencyMetadataArray(facade.deps),
     host: extractHostBindings(facade.propMetadata, facade.typeSourceSpan, facade.host),
@@ -277,7 +277,7 @@ function wrapExpression(obj: any, property: string): WrappedNodeExpr<any>|undefi
   }
 }
 
-function computeProvidedIn(providedIn: Type | string | null | undefined): Expression {
+function computeProvidedIn(providedIn: Type|string|null|undefined): Expression {
   if (providedIn == null || typeof providedIn === 'string') {
     return new LiteralExpr(providedIn);
   } else {
@@ -296,16 +296,17 @@ function convertR3DependencyMetadata(facade: R3DependencyMetadataFacade): R3Depe
   }
   return {
     token: tokenExpr,
+    attribute: null,
     resolved: facade.resolved,
     host: facade.host,
     optional: facade.optional,
     self: facade.self,
-    skipSelf: facade.skipSelf
+    skipSelf: facade.skipSelf,
   };
 }
 
-function convertR3DependencyMetadataArray(facades: R3DependencyMetadataFacade[] | null | undefined):
-    R3DependencyMetadata[]|null {
+function convertR3DependencyMetadataArray(facades: R3DependencyMetadataFacade[]|null|
+                                          undefined): R3DependencyMetadata[]|null {
   return facades == null ? null : facades.map(convertR3DependencyMetadata);
 }
 
@@ -355,13 +356,11 @@ function isOutput(value: any): value is Output {
 }
 
 function parseInputOutputs(values: string[]): StringMap {
-  return values.reduce(
-      (map, value) => {
-        const [field, property] = value.split(',').map(piece => piece.trim());
-        map[field] = property || field;
-        return map;
-      },
-      {} as StringMap);
+  return values.reduce((map, value) => {
+    const [field, property] = value.split(',').map(piece => piece.trim());
+    map[field] = property || field;
+    return map;
+  }, {} as StringMap);
 }
 
 export function publishFacade(global: any) {

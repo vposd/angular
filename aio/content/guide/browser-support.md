@@ -34,7 +34,7 @@ Angular supports most recent browsers. This includes the following specific vers
     </td>
 
     <td>
-      latest
+      latest and extended support release (ESR)
     </td>
   </tr>
 
@@ -53,7 +53,8 @@ Angular supports most recent browsers. This includes the following specific vers
       IE
     </td>
     <td>
-      11, 10, 9 ("compatibility view" mode not supported)
+      <div> 11, 10*, 9* ("compatibility view" mode not supported) </div>
+      <div>*deprecated in v10, see the <a href="/guide/deprecations#ie-9-10">deprecations guide</a>.</div>
     </td>
   </tr>
  <tr>
@@ -89,7 +90,7 @@ Angular supports most recent browsers. This includes the following specific vers
     </td>
 
     <td>
-      Nougat (7.0), Marshmallow (6.0), Lollipop (5.0, 5.1), KitKat (4.4)
+      X (10.0), Pie (9.0), Oreo (8.0), Nougat (7.0)
     </td>
   </tr>
 
@@ -303,7 +304,7 @@ Some features of Angular may require additional polyfills.
     <td>
 
       [Router](guide/router) when using
-      [hash-based routing](guide/router#appendix-locationstrategy-and-browser-url-styles)
+      [hash-based routing](guide/router#location-strategy)
     </td>
 
     <td>

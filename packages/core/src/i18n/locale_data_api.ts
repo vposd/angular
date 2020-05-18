@@ -5,8 +5,9 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import localeEn from './locale_en';
 import {global} from '../util/global';
+
+import localeEn from './locale_en';
 
 /**
  * This const is used to store the locale data registered with `registerLocaleData`
@@ -19,7 +20,7 @@ let LOCALE_DATA: {[localeId: string]: any} = {};
  *
  * The signature `registerLocaleData(data: any, extraData?: any)` is deprecated since v5.1
  */
-export function registerLocaleData(data: any, localeId?: string | any, extraData?: any): void {
+export function registerLocaleData(data: any, localeId?: string|any, extraData?: any): void {
   if (typeof localeId !== 'string') {
     extraData = localeId;
     localeId = data[LocaleDataIndex.LocaleId];
@@ -61,6 +62,20 @@ export function findLocaleData(locale: string): any {
   }
 
   throw new Error(`Missing locale data for the locale "${locale}".`);
+}
+
+/**
+ * Retrieves the default currency code for the given locale.
+ *
+ * The default is defined as the first currency which is still in use.
+ *
+ * @param locale The code of the locale whose currency code we want.
+ * @returns The code of the default currency for the given locale.
+ *
+ */
+export function getLocaleCurrencyCode(locale: string): string|null {
+  const data = findLocaleData(locale);
+  return data[LocaleDataIndex.CurrencyCode] || null;
 }
 
 /**
@@ -116,9 +131,11 @@ export enum LocaleDataIndex {
   DateTimeFormat,
   NumberSymbols,
   NumberFormats,
+  CurrencyCode,
   CurrencySymbol,
   CurrencyName,
   Currencies,
+  Directionality,
   PluralCase,
   ExtraData
 }
@@ -135,7 +152,11 @@ export const enum ExtraLocaleDataIndex {
 /**
  * Index of each value in currency data (used to describe CURRENCIES_EN in currencies.ts)
  */
-export const enum CurrencyIndex {Symbol = 0, SymbolNarrow, NbOfDigits}
+export const enum CurrencyIndex {
+  Symbol = 0,
+  SymbolNarrow,
+  NbOfDigits
+}
 
 /**
  * Returns the canonical form of a locale name - lowercase with `_` replaced with `-`.

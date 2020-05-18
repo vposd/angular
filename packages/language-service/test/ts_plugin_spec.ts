@@ -8,7 +8,7 @@
 
 import * as ts from 'typescript';
 
-import {create, getExternalFiles} from '../src/ts_plugin';
+import {create} from '../src/ts_plugin';
 import {CompletionKind} from '../src/types';
 
 import {MockTypescriptHost} from './test_utils';
@@ -26,7 +26,7 @@ const mockProject = {
 describe('plugin', () => {
   const mockHost = new MockTypescriptHost(['/app/main.ts']);
   const tsLS = ts.createLanguageService(mockHost);
-  const program = tsLS.getProgram() !;
+  const program = tsLS.getProgram()!;
   const plugin = create({
     languageService: tsLS,
     languageServiceHost: mockHost,
@@ -35,7 +35,9 @@ describe('plugin', () => {
     config: {},
   });
 
-  beforeEach(() => { mockHost.reset(); });
+  beforeEach(() => {
+    mockHost.reset();
+  });
 
   it('should produce TypeScript diagnostics', () => {
     const fileName = '/foo.ts';
@@ -55,19 +57,14 @@ describe('plugin', () => {
     const compilerDiags = tsLS.getCompilerOptionsDiagnostics();
     expect(compilerDiags).toEqual([]);
     const sourceFiles = program.getSourceFiles().filter(f => !f.fileName.endsWith('.d.ts'));
-    // there are six .ts files in the test project
-    expect(sourceFiles.length).toBe(6);
+    // there are three .ts files in the test project
+    expect(sourceFiles.length).toBe(3);
     for (const {fileName} of sourceFiles) {
       const syntacticDiags = tsLS.getSyntacticDiagnostics(fileName);
       expect(syntacticDiags).toEqual([]);
       const semanticDiags = tsLS.getSemanticDiagnostics(fileName);
       expect(semanticDiags).toEqual([]);
     }
-  });
-
-  it('should return external templates as external files', () => {
-    const externalFiles = getExternalFiles(mockProject);
-    expect(externalFiles).toEqual(['/app/test.ng']);
   });
 
   it('should not report template errors on tour of heroes', () => {
@@ -122,12 +119,13 @@ describe('plugin', () => {
     const marker = mockHost.getLocationMarkerFor(MY_COMPONENT, 'tree');
     const completions = plugin.getCompletionsAtPosition(MY_COMPONENT, marker.start, undefined);
     expect(completions).toBeDefined();
-    expect(completions !.entries).toEqual([
+    expect(completions!.entries).toEqual([
       {
         name: 'children',
         kind: CompletionKind.PROPERTY as any,
         sortText: 'children',
         replacementSpan: {start: 182, length: 8},
+        insertText: 'children',
       },
     ]);
   });

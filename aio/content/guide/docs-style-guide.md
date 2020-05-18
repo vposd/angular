@@ -1,7 +1,7 @@
-# Angular Documentation Style Guide
+# Angular documentation style guide
 <!-- formerly Authors Style Guide -->
 
-This Style Guide is for anyone who contributes to the Angular documentation (this site).
+This style guide is for anyone who contributes to the Angular documentation (this site).
 These guidelines should be followed by all authors.
 Deviations must be approved by a documentation editor.
 
@@ -139,24 +139,26 @@ The title should appear at the top of the physical page.
 Begin the title with the markdown `#` character. Alternatively, you can write the equivalent `<h1>`.
 
 ```html
-  # Authors Style Guide
+  # Angular documentation style guide
 ```
 
 **Only one title (`<h1>`) per document!**
 
-Title text should be in "Title Case", which means that you use capital letters to start the first words and all _principal_ words. Use lower case letters for _secondary_ words such as "in", "of", and "the".
+Title text should be in "Sentence case", which means the first word is capitalized and all other words are lower case (unless they are technical terms that are always capitalized, like "Angular").
 
 ```html
-  # The Meat of the Matter
+  # Deprecation policy in Angular
 ```
 
 **Always follow the title with at least one blank line.**
+
+Note that the corresponding left-nav TOC text should be in "title case", which means that you use capital letters to start the first words and all principal words. Use lower case letters for secondary words such as "in", "of", and "the". The TOC title can also be shortened to fit in the column.
 
 ## Sections
 
 A typical document is divided into sections.
 
-All section heading text should be in "Sentence case", which means the first word is capitalized and all other words are lower case.
+All heading text should be in "Sentence case", which means the first word is capitalized and all other words are lower case.
 
 **Always follow the section heading with at least one blank line.**
 
@@ -1008,21 +1010,21 @@ Callouts use the same _urgency levels_ that alerts do.
 <div class="callout is-critical">
 <header>A critical point</header>
 
-**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast, Schlitz crucifix
+**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast
 
 </div>
 
 <div class="callout is-important">
 <header>An important point</header>
 
-**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast, Schlitz crucifix
+**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast
 
 </div>
 
 <div class="callout is-helpful">
 <header>A helpful or informational point</header>
 
-**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast, Schlitz crucifix
+**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast
 
 </div>
 
@@ -1031,7 +1033,7 @@ Here is the markup for the first of these callouts.
 <div class="callout is-critical">
 <header>A critical point</header>
 
-**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast, Schlitz crucifix
+**Pitchfork hoodie semiotics**, roof party pop-up _paleo_ messenger bag cred Carles tousled Truffaut yr. Semiotics viral freegan VHS, Shoreditch disrupt McSweeney's. Intelligentsia kale chips Vice four dollar toast
 
 </div>
 ```

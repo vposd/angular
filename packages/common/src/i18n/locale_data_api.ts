@@ -6,8 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ɵCurrencyIndex, ɵExtraLocaleDataIndex, ɵLocaleDataIndex, ɵfindLocaleData, ɵgetLocalePluralCase} from '@angular/core';
+import {ɵCurrencyIndex, ɵExtraLocaleDataIndex, ɵfindLocaleData, ɵgetLocaleCurrencyCode, ɵgetLocalePluralCase, ɵLocaleDataIndex} from '@angular/core';
+
 import {CURRENCIES_EN, CurrenciesSymbols} from './currencies';
+
 
 /**
  * Format styles that can be used to represent numbers.
@@ -45,7 +47,7 @@ export enum Plural {
  * Context-dependant translation forms for strings.
  * Typically the standalone version is for the nominative form of the word,
  * and the format version is used for the genitive case.
- * @see [CLDR website](http://cldr.unicode.org/translation/date-time#TOC-Stand-Alone-vs.-Format-Styles)
+ * @see [CLDR website](http://cldr.unicode.org/translation/date-time-1/date-time#TOC-Standalone-vs.-Format-Styles)
  * @see [Internationalization (i18n) Guide](https://angular.io/guide/i18n)
  *
  * @publicApi
@@ -233,9 +235,9 @@ export function getLocaleId(locale: string): string {
 export function getLocaleDayPeriods(
     locale: string, formStyle: FormStyle, width: TranslationWidth): [string, string] {
   const data = ɵfindLocaleData(locale);
-  const amPmData = <[
-    string, string
-  ][][]>[data[ɵLocaleDataIndex.DayPeriodsFormat], data[ɵLocaleDataIndex.DayPeriodsStandalone]];
+  const amPmData = <[string, string][][]>[
+    data[ɵLocaleDataIndex.DayPeriodsFormat], data[ɵLocaleDataIndex.DayPeriodsStandalone]
+  ];
   const amPm = getLastDefinedValue(amPmData, formStyle);
   return getLastDefinedValue(amPm, width);
 }
@@ -474,6 +476,20 @@ export function getLocaleCurrencyName(locale: string): string|null {
 }
 
 /**
+ * Retrieves the default currency code for the given locale.
+ *
+ * The default is defined as the first currency which is still in use.
+ *
+ * @param locale The code of the locale whose currency code we want.
+ * @returns The code of the default currency for the given locale.
+ *
+ * @publicApi
+ */
+export function getLocaleCurrencyCode(locale: string): string|null {
+  return ɵgetLocaleCurrencyCode(locale);
+}
+
+/**
  * Retrieves the currency values for a given locale.
  * @param locale A locale code for the locale format rules to use.
  * @returns The currency values.
@@ -493,8 +509,9 @@ export const getLocalePluralCase: (locale: string) => ((value: number) => Plural
 
 function checkFullData(data: any) {
   if (!data[ɵLocaleDataIndex.ExtraData]) {
-    throw new Error(
-        `Missing extra locale data for the locale "${data[ɵLocaleDataIndex.LocaleId]}". Use "registerLocaleData" to load new data. See the "I18n guide" on angular.io to know more.`);
+    throw new Error(`Missing extra locale data for the locale "${
+        data[ɵLocaleDataIndex
+                 .LocaleId]}". Use "registerLocaleData" to load new data. See the "I18n guide" on angular.io to know more.`);
   }
 }
 
@@ -520,11 +537,11 @@ function checkFullData(data: any) {
  *
  * @publicApi
  */
-export function getLocaleExtraDayPeriodRules(locale: string): (Time | [Time, Time])[] {
+export function getLocaleExtraDayPeriodRules(locale: string): (Time|[Time, Time])[] {
   const data = ɵfindLocaleData(locale);
   checkFullData(data);
   const rules = data[ɵLocaleDataIndex.ExtraData][ɵExtraLocaleDataIndex.ExtraDayPeriodsRules] || [];
-  return rules.map((rule: string | [string, string]) => {
+  return rules.map((rule: string|[string, string]) => {
     if (typeof rule === 'string') {
       return extractTime(rule);
     }
@@ -554,11 +571,23 @@ export function getLocaleExtraDayPeriods(
   const data = ɵfindLocaleData(locale);
   checkFullData(data);
   const dayPeriodsData = <string[][][]>[
-      data[ɵLocaleDataIndex.ExtraData][ɵExtraLocaleDataIndex.ExtraDayPeriodFormats],
-      data[ɵLocaleDataIndex.ExtraData][ɵExtraLocaleDataIndex.ExtraDayPeriodStandalone]
+    data[ɵLocaleDataIndex.ExtraData][ɵExtraLocaleDataIndex.ExtraDayPeriodFormats],
+    data[ɵLocaleDataIndex.ExtraData][ɵExtraLocaleDataIndex.ExtraDayPeriodStandalone]
   ];
   const dayPeriods = getLastDefinedValue(dayPeriodsData, formStyle) || [];
   return getLastDefinedValue(dayPeriods, width) || [];
+}
+
+/**
+ * Retrieves the writing direction of a specified locale
+ * @param locale A locale code for the locale format rules to use.
+ * @publicApi
+ * @returns 'rtl' or 'ltr'
+ * @see [Internationalization (i18n) Guide](https://angular.io/guide/i18n)
+ */
+export function getLocaleDirection(locale: string): 'ltr'|'rtl' {
+  const data = ɵfindLocaleData(locale);
+  return data[ɵLocaleDataIndex.Directionality];
 }
 
 /**
@@ -618,7 +647,7 @@ function extractTime(time: string): Time {
  *
  * @publicApi
  */
-export function getCurrencySymbol(code: string, format: 'wide' | 'narrow', locale = 'en'): string {
+export function getCurrencySymbol(code: string, format: 'wide'|'narrow', locale = 'en'): string {
   const currency = getLocaleCurrencies(locale)[code] || CURRENCIES_EN[code] || [];
   const symbolNarrow = currency[ɵCurrencyIndex.SymbolNarrow];
 

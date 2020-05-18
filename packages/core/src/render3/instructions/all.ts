@@ -25,16 +25,14 @@
  *
  * Jira Issue = FW-1184
  */
-export * from './alloc_host_vars';
 export * from './attribute';
 export * from './attribute_interpolation';
 export * from './change_detection';
-export * from './container';
+export * from './template';
 export * from './storage';
 export * from './di';
 export * from './element';
 export * from './element_container';
-export * from './embedded_view';
 export * from './get_current_view';
 export * from './listener';
 export * from './namespace';
@@ -47,5 +45,6 @@ export * from './styling';
 export * from './text';
 export * from './text_interpolation';
 export * from './class_map_interpolation';
+export * from './style_map_interpolation';
 export * from './style_prop_interpolation';
 export * from './host_property';

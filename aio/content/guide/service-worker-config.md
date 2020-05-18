@@ -7,16 +7,17 @@ A basic understanding of the following:
 
 <hr />
 
-The `src/ngsw-config.json` configuration file specifies which files and data URLs the Angular
-service worker should cache and how it should update the cached files and data. The
-[Angular CLI](cli) processes the configuration file during `ng build --prod`. Manually, you can process
-it with the `ngsw-config` tool:
+The `ngsw-config.json` configuration file specifies which files and data URLs the Angular service
+worker should cache and how it should update the cached files and data. The [Angular CLI](cli)
+processes the configuration file during `ng build --prod`. Manually, you can process it with the
+`ngsw-config` tool (where `<project-name>` is the name of the project being built):
 
-```sh
-ngsw-config dist src/ngsw-config.json /base/href
-```
+<code-example language="sh">
+./node_modules/.bin/ngsw-config ./dist/&lt;project-name&gt; ./ngsw-config.json [/base/href]
+</code-example>
 
-The configuration file uses the JSON format. All file paths must begin with `/`, which is the deployment directory&mdash;usually `dist` in CLI projects.
+The configuration file uses the JSON format. All file paths must begin with `/`, which corresponds
+to the deployment directory&mdash;usually `dist/<project-name>` in CLI projects.
 
 {@a glob-patterns}
 Unless otherwise noted, patterns use a limited glob format:
@@ -73,6 +74,9 @@ interface AssetGroup {
     files?: string[];
     urls?: string[];
   };
+  cacheQueryOptions?: {
+    ignoreSearch?: boolean;
+  };
 }
 ```
 
@@ -109,6 +113,12 @@ This section describes the resources to cache, broken up into the following grou
 * `urls` includes both URLs and URL patterns that will be matched at runtime. These resources are not fetched directly and do not have content hashes, but they will be cached according to their HTTP headers. This is most useful for CDNs such as the Google Fonts service.<br>
   _(Negative glob patterns are not supported and `?` will be matched literally; i.e. it will not match any character other than `?`.)_
 
+### `cacheQueryOptions`
+
+These options are used to modify the matching behavior of requests. They are passed to the browsers `Cache#match` function. See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Cache/match) for details. Currently, only the following options are supported:
+
+* `ignoreSearch`: Ignore query parameters. Defaults to `false`.
+
 ## `dataGroups`
 
 Unlike asset resources, data requests are not versioned along with the app. They're cached according to manually-configured policies that are more useful for situations such as API requests and other data dependencies.
@@ -125,6 +135,9 @@ export interface DataGroup {
     maxAge: string;
     timeout?: string;
     strategy?: 'freshness' | 'performance';
+  };
+  cacheQueryOptions?: {
+    ignoreSearch?: boolean;
   };
 }
 ```
@@ -179,6 +192,10 @@ The Angular service worker can use either of two caching strategies for data res
 * `performance`, the default, optimizes for responses that are as fast as possible. If a resource exists in the cache, the cached version is used, and no network request is made. This allows for some staleness, depending on the `maxAge`, in exchange for better performance. This is suitable for resources that don't change often; for example, user avatar images.
 
 * `freshness` optimizes for currency of data, preferentially fetching requested data from the network. Only if the network times out, according to `timeout`, does the request fall back to the cache. This is useful for resources that change frequently; for example, account balances.
+
+### `cacheQueryOptions`
+
+See [assetGroups](#assetgroups) for details.
 
 ## `navigationUrls`
 
